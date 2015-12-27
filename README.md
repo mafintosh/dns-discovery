@@ -71,7 +71,7 @@ As a shorthand option you can use `disc.announce(name, port)`
 
 Stop announcing a peer for an app.
 
-#### `disc.listen(port, [callback])`
+#### `disc.listen([port], [callback])`
 
 Listen for dns records on a specific port. You *only* need to call this if you want to turn your peer into a tracker that other peers can use to store peer objects on.
 
@@ -84,6 +84,7 @@ tracker.listen(9090, function () {
 ```
 
 You can setup a tracker to announce records on the internet as multicast-dns only works on a local network.
+The port defaults to `53` which is the standard dns port.
 
 ## License
 

@@ -77,7 +77,7 @@ module.exports = function (opts) {
   discover.listen = function (port, cb) {
     if (server) throw new Error('Already listening')
     discover.on('peer', add)
-    server = mdns({multicast: false, port: port})
+    server = mdns({multicast: false, port: port || 53})
     ondnssocket(server, true)
     if (cb) server.on('ready', cb)
   }
