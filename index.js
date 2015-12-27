@@ -2,7 +2,6 @@ var fifo = require('fifo')
 var util = require('util')
 var mdns = require('multicast-dns')
 var txt = require('mdns-txt')()
-var net = require('net')
 var addr = require('network-address')
 var events = require('events')
 var crypto = require('crypto')
@@ -15,7 +14,6 @@ module.exports = function (opts) {
   var tracker = opts.tracker && parse(opts.tracker)
   var suffix = '.dns-discovery.local'
   var host = opts.host
-  var port = 0
   var ttl = opts.ttl || 0
   var external = tracker && mdns({multicast: false, port: 0})
   var internal = opts.multicast !== false && mdns()

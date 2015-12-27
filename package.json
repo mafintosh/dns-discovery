@@ -10,10 +10,11 @@
     "network-address": "^1.0.0"
   },
   "devDependencies": {
+    "standard": "^5.4.1",
     "tape": "^4.4.0"
   },
   "scripts": {
-    "test": "tape test.js"
+    "test": "standard && tape test.js"
   },
   "repository": {
     "type": "git",
