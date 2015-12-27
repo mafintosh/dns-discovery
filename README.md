@@ -6,6 +6,8 @@ Discovery peers in a distributed system using regular dns and multicast dns.
 npm install dns-discovery
 ```
 
+[![build status](http://img.shields.io/travis/mafintosh/dns-discovery.svg?style=flat)](http://travis-ci.org/mafintosh/dns-discovery)
+
 ## Usage
 
 ``` js
