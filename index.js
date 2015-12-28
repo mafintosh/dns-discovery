@@ -283,10 +283,10 @@ Records.prototype.add = function (record) {
     time: Date.now()
   }
 
-  this.emit('add', container)
   this.count++
   this.owners[record.id] = container
   this.records.push(container)
+  this.emit('add', container)
 
   return container
 }
