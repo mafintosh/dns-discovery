@@ -86,6 +86,49 @@ tracker.listen(9090, function () {
 You can setup a tracker to announce records on the internet as multicast-dns only works on a local network.
 The port defaults to `53` which is the standard dns port.
 
+## CLI
+
+There is a cli tool available as well
+
+``` sh
+npm install -g dns-discovery
+dns-discovery help
+```
+
+To announce a service do
+
+``` sh
+# will announce test-app over multicast-dns
+dns-discovery announce test-app --port=8080
+```
+
+To look it up
+
+``` sh
+# will print services when they are found
+dns-discovery lookup test-app
+```
+
+To run a tracker
+
+``` sh
+# listen for services and store them with a ttl of 30s
+dns-discovery listen --port=9090 --ttl=30
+```
+
+And to announce to that tracker (and over multicast-dns)
+
+``` sh
+# replace example.com with the host of the server running the tracker
+dns-discovery announce test-app --tracker=example.com:9090 --port=9090
+```
+
+And finally to lookup using that tracker (and multicast-dns)
+
+``` sh
+dns-discovery lookup test-app --tracker=example.com:9090
+```
+
 ## License
 
 MIT
