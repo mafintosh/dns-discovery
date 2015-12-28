@@ -1,16 +1,13 @@
 var fifo = require('fifo')
 var util = require('util')
 var mdns = require('multicast-dns')
-var txt = require('mdns-txt')()
 var addr = require('network-address')
 var events = require('events')
-var crypto = require('crypto')
 
 module.exports = function (opts) {
   if (!opts) opts = {}
 
   var discover = new events.EventEmitter()
-  var peerId = opts.peer || crypto.randomBytes(32).toString('hex')
   var tracker = opts.tracker && parse(opts.tracker)
   var suffix = '.' + (opts.domain || 'dns-discovery.local')
   var host = opts.host
@@ -20,7 +17,6 @@ module.exports = function (opts) {
   var server = null
   var domains = new Store(opts)
 
-  if (Buffer.isBuffer(peerId)) peerId = peerId.toString('hex')
   if (external) ondnssocket(external, true)
   if (internal) ondnssocket(internal, false)
 
@@ -29,7 +25,7 @@ module.exports = function (opts) {
 
     var record = {
       questions: [{
-        type: 'TXT',
+        type: 'SRV',
         name: id + suffix
       }]
     }
@@ -43,16 +39,17 @@ module.exports = function (opts) {
     if (typeof peer === 'number') peer = {port: peer}
     if (Buffer.isBuffer(id)) id = id.toString('hex')
 
-    if (!peer.id) peer.id = peerId
-    if (!peer.host) peer.host = host
+    if (!peer.host) peer.host = host || '0.0.0.0'
 
-    var addr = peer.id + '@' + (peer.host ? peer.host : '') + (peer.port ? ':' + peer.port : '')
     var record = {
       answers: [{
-        type: 'TXT',
+        type: 'SRV',
         name: id + suffix,
         ttl: ttl,
-        data: txt.encode({peer: addr})
+        data: {
+          target: peer.host,
+          port: peer.port
+        }
       }]
     }
 
@@ -63,15 +60,14 @@ module.exports = function (opts) {
   }
 
   discover.unannounce = function (id, peer) {
-    if (typeof peer === 'number') peer = {port: peer}
-    if (!peer) peer = {id: peerId}
+    var port = typeof peer === 'number' ? peer : peer.port
+    var host = (typeof peer === 'number' ? host : peer.host) || '0.0.0.0'
+    var addr = host + ':' + port
+
     var store = domains.get(id)
     if (!store) return
-    var rec = store.owners[peer.id || peerId]
-    if (!rec) return
-    if (peer.port && peer.port !== rec.port) return
-    if (peer.host && peer.host !== rec.host) return
-    store.remove(rec)
+    var rec = store.byaddr[addr]
+    if (rec) store.remove(rec)
   }
 
   discover.listen = function (port, cb) {
@@ -110,6 +106,7 @@ module.exports = function (opts) {
   function ondnssocket (socket, external) {
     socket.on('query', function (query, rinfo) {
       var answers = []
+
       for (var i = 0; i < query.questions.length; i++) {
         var q = query.questions[i]
         if (q.name.slice(-suffix.length) !== suffix) continue
@@ -124,22 +121,13 @@ module.exports = function (opts) {
           if (!peer) break
 
           switch (q.type) {
-            case 'TXT':
-              answers.push({
-                type: 'TXT',
-                name: q.name,
-                ttl: ttl,
-                data: txt.encode({peer: peer.addr})
-              })
-              break
-
             case 'SRV':
               answers.push({
                 type: 'SRV',
                 name: q.name,
                 ttl: ttl,
                 data: {
-                  target: peer.host || addr(),
+                  target: peer.host === '0.0.0.0' ? addr() : peer.host,
                   port: peer.port
                 }
               })
@@ -164,25 +152,17 @@ module.exports = function (opts) {
       for (var i = 0; i < response.answers.length; i++) answer(response.answers[i], rinfo)
       for (var j = 0; j < response.additionals.length; j++) answer(response.additionals[j], rinfo)
     })
-  }
 
-  function answer (a, rinfo) {
-    if (a.type !== 'TXT') return
-    if (a.name.slice(-suffix.length) !== suffix) return
-    var data = txt.decode(a.data)
-    if (!data.peer) return
-    var match = data.peer.toString().match(/(.+)@([^:]*)(:(\d+))?/)
-    if (!match) return
+    function answer (a, rinfo) {
+      if (a.type !== 'SRV') return
+      if (a.name.slice(-suffix.length) !== suffix) return
 
-    var id = match[1]
-    var host = match[2] || rinfo.address
-    var port = Number(match[4] || 0)
-
-    discover.emit('peer', a.name.slice(0, -suffix.length), {
-      host: host,
-      port: port,
-      id: id
-    })
+      discover.emit('peer', a.name.slice(0, -suffix.length), {
+        local: !external,
+        host: a.data.target === '0.0.0.0' ? rinfo.address().address : a.data.target,
+        port: a.data.port
+      })
+    }
   }
 }
 
@@ -269,34 +249,30 @@ function Records (name, opts) {
   this.name = name
   this.ttl = 1000 * (opts.ttl || 0)
   this.records = []
-  this.owners = {}
+  this.byaddr = {}
   events.EventEmitter.call(this)
 }
 
 util.inherits(Records, events.EventEmitter)
 
 Records.prototype.add = function (record) {
-  var old = this.owners[record.id]
+  var addr = record.host + ':' + record.port
+  var old = this.byaddr[addr]
 
   if (old) {
-    old.host = record.host
-    old.port = record.port
-    old.addr = record.id + '@' + (record.host || '') + (record.port ? ':' + record.port : '')
     old.time = Date.now()
     return old
   }
 
   var container = {
     index: this.records.length,
-    id: record.id,
     host: record.host,
     port: record.port,
-    addr: record.id + '@' + (record.host || '') + (record.port ? ':' + record.port : ''),
     time: Date.now()
   }
 
   this.count++
-  this.owners[record.id] = container
+  this.byaddr[addr] = container
   this.records.push(container)
   this.emit('add', container)
 
@@ -307,7 +283,7 @@ Records.prototype.remove = function (container) {
   var last = this.records.pop()
   if (!last) return
   this.count--
-  delete this.owners[container.id]
+  delete this.byaddr[container.host + ':' + container.port]
   if (last !== container) {
     last.index = container.index
     this.records[last.index] = last

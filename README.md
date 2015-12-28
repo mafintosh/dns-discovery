@@ -34,7 +34,6 @@ Create a new discovery instance. Options include:
 
 ``` js
 {
-  peer: 'a-peer-id', // put you peer id here. defaults to a random string
   tracker: 'tracker.example.com:9090', // put a centralized dns tracker here
   ttl: someSeconds, // ttl for records in seconds. defaults to Infinity.
   limit: someLimit, // max number of records stored. defaults to 10000.
@@ -50,7 +49,7 @@ Do a lookup for a specific app name. When new peers are discovered for this name
 ``` js
 disc.on('peer', function (name, peer) {
   console.log(name) // app name this peer was discovered for
-  console.log(peer) // {host: 'some-ip', port: somePort, id: peerId}
+  console.log(peer) // {host: 'some-ip', port: somePort}
 })
 ```
 
@@ -62,13 +61,12 @@ Announce a new peer for a specific app name. `peer` should be an object looking 
 {
   host: someHost // defaults to your local network ip
   port: somePort // you have to specify this
-  id: optionalPeerId // defaults to the peer id specified in the constructor
 }
 ```
 
 As a shorthand option you can use `disc.announce(name, port)`
 
-#### `disc.unannounce(name, [peer])
+#### `disc.unannounce(name, peer)`
 
 Stop announcing a peer for an app.
 
@@ -128,6 +126,13 @@ And finally to lookup using that tracker (and multicast-dns)
 
 ``` sh
 dns-discovery lookup test-app --tracker=example.com:9090
+```
+
+You can use any other dns client to resolve the records as well. For example using `dig`.
+
+``` sh
+# dig requires the tracker to run on port 53
+dig @tracker.example.com test-app SRV
 ```
 
 ## License

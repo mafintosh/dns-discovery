@@ -11,11 +11,11 @@ freePort(function (port) {
     disc.on('peer', function (name, peer) {
       disc.destroy()
       t.same(name, appName)
-      t.same(peer, {id: 'a-peer-id', host: '127.0.0.1', port: 8080})
+      t.same(peer, {host: '127.0.0.1', port: 8080, local: true})
       t.end()
     })
 
-    disc.announce(appName, {id: 'a-peer-id', port: 8080, host: '127.0.0.1'})
+    disc.announce(appName, {port: 8080, host: '127.0.0.1'})
     disc.lookup(appName)
   })
 
@@ -27,18 +27,18 @@ freePort(function (port) {
 
     tracker.on('peer', function (name, peer) {
       t.same(name, 'hello-world')
-      t.same(peer, {id: 'a-peer-id', host: '127.0.0.1', port: 8080})
+      t.same(peer, {host: '127.0.0.1', port: 8080, local: false})
     })
 
     client.on('peer', function (name, peer) {
       t.same(name, 'hello-world')
-      t.same(peer, {id: 'a-peer-id', host: '127.0.0.1', port: 8080})
+      t.same(peer, {host: '127.0.0.1', port: 8080, local: false})
       tracker.destroy()
       client.destroy()
     })
 
     tracker.listen(port, function () {
-      client.announce('hello-world', {port: 8080, id: 'a-peer-id', host: '127.0.0.1'}, function () {
+      client.announce('hello-world', {port: 8080, host: '127.0.0.1'}, function () {
         client.lookup('hello-world')
       })
     })
@@ -47,8 +47,8 @@ freePort(function (port) {
   tape('limit', function (t) {
     var tracker = discovery({multicast: false, limit: 1})
 
-    tracker.announce('hello-world', {port: 8080, id: 'a-peer-id', host: '127.0.0.1'})
-    tracker.announce('hello-world-2', {port: 8081, id: 'a-peer-id', host: '127.0.0.1'})
+    tracker.announce('hello-world', {port: 8080, host: '127.0.0.1'})
+    tracker.announce('hello-world-2', {port: 8081, host: '127.0.0.1'})
 
     var domains = tracker.toJSON()
     t.same(domains.length, 1)

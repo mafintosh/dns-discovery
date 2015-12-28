@@ -47,8 +47,9 @@ function announce () {
 }
 
 function onpeer (name, peer) {
-  if (rcvd[peer.id]) return
-  rcvd[peer.id] = true
+  var addr = peer.host + ':' + peer.host
+  if (rcvd[addr]) return
+  rcvd[addr] = true
   console.log(name, peer)
 }
 
