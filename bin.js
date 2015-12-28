@@ -12,7 +12,7 @@ var disc
 
 if (cmd === 'listen') {
   disc = discovery(argv)
-  disc.listen(argv.port, console.log)
+  disc.listen(argv.port, onlisten)
 } else if (cmd === 'lookup') {
   disc = discovery(argv)
   disc.on('peer', console.log)
@@ -36,4 +36,9 @@ if (cmd === 'listen') {
     '     --ttl=(optional ttl in seconds)\n'
   )
   process.exit(1)
+}
+
+function onlisten (err) {
+  if (err) throw err
+  console.log('Server is listening on port %d', argv.port || 53)
 }
