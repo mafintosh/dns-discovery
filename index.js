@@ -12,7 +12,7 @@ module.exports = function (opts) {
   var discover = new events.EventEmitter()
   var peerId = opts.peer || crypto.randomBytes(32).toString('hex')
   var tracker = opts.tracker && parse(opts.tracker)
-  var suffix = '.dns-discovery.local'
+  var suffix = '.' + opts.domain || 'dns-discovery.local'
   var host = opts.host
   var ttl = opts.ttl || 0
   var external = tracker && mdns({multicast: false, port: 0})
@@ -109,6 +109,7 @@ module.exports = function (opts) {
 
   function ondnssocket (socket, external) {
     socket.on('query', function (query, rinfo) {
+      var answers = []
       for (var i = 0; i < query.questions.length; i++) {
         var q = query.questions[i]
         if (q.name.slice(-suffix.length) !== suffix) continue
@@ -116,7 +117,6 @@ module.exports = function (opts) {
         var store = domains.get(q.name)
         if (!store) continue
 
-        var answers = []
         var peer = null
 
         while (answers.length < 10) {
@@ -133,6 +133,18 @@ module.exports = function (opts) {
               })
               break
 
+            case 'SRV':
+              answers.push({
+                type: 'SRV',
+                name: q.name,
+                ttl: ttl,
+                data: {
+                  target: peer.host || addr(),
+                  port: peer.port
+                }
+              })
+              break
+
             case 'A':
               answers.push({
                 type: 'A',
@@ -143,9 +155,9 @@ module.exports = function (opts) {
               break
           }
         }
-
-        if (answers.length) socket.respond(answers, external ? rinfo : null)
       }
+
+      if (external || answers.length) socket.respond({id: query.id, answers: answers}, external ? rinfo : null)
     })
 
     socket.on('response', function (response, rinfo) {

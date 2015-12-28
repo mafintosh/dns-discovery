@@ -38,7 +38,8 @@ Create a new discovery instance. Options include:
   tracker: 'tracker.example.com:9090', // put a centralized dns tracker here
   ttl: someSeconds, // ttl for records in seconds. defaults to Infinity.
   limit: someLimit, // max number of records stored. defaults to 10000.
-  multicast: true // use multicast-dns. defaults to true.
+  multicast: true, // use multicast-dns. defaults to true.
+  domain: 'my-domain.com' // top-level domain to use for records. defaults to dns-discovery.local
 }
 ```
 
