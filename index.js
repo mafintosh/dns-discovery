@@ -157,7 +157,7 @@ module.exports = function (opts) {
         }
       }
 
-      if (external || answers.length) socket.respond({id: query.id, answers: answers}, external ? rinfo : null)
+      if (query.id || answers.length) socket.respond({id: query.id, answers: answers}, external ? rinfo : null)
     })
 
     socket.on('response', function (response, rinfo) {
