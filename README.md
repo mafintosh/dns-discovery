@@ -124,7 +124,7 @@ dns-discovery announce test-app --tracker=localhost:9090 --port=8080 --heartbeat
 And finally to lookup using that tracker (and multicast-dns)
 
 ``` sh
-dns-discovery lookup test-app --tracker=example.com:9090
+dns-discovery lookup test-app --tracker=localhost:9090
 ```
 
 You can use any other dns client to resolve the records as well. For example using `dig`.

@@ -306,6 +306,7 @@ Records.prototype.remove = function (container) {
     this.records[last.index] = last
   }
   this.emit('remove', container)
+  debug('store removed %j', container)
 }
 
 Records.prototype.random = function (prev) {
