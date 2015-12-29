@@ -112,14 +112,13 @@ To run a tracker
 
 ``` sh
 # listen for services and store them with a ttl of 30s
-dns-discovery listen --port=9090 --ttl=30
+dns-discovery listen --port=9090 --ttl=30 -v
 ```
 
 And to announce to that tracker (and over multicast-dns)
 
 ``` sh
-# replace example.com with the host of the server running the tracker
-dns-discovery announce test-app --tracker=example.com:9090 --port=9090
+dns-discovery announce test-app --tracker=localhost:9090 --port=8080 --heartbeat=3500 -v
 ```
 
 And finally to lookup using that tracker (and multicast-dns)
@@ -131,8 +130,7 @@ dns-discovery lookup test-app --tracker=example.com:9090
 You can use any other dns client to resolve the records as well. For example using `dig`.
 
 ``` sh
-# dig requires the tracker to run on port 53
-dig @tracker.example.com test-app SRV
+dig @127.0.0.1 test-app.dns-discovery.local SRV -p 9090 +short
 ```
 
 ## License
