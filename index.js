@@ -1,3 +1,5 @@
+var pkg = require('./package.json')
+var debug = require('debug')(pkg.name)
 var fifo = require('fifo')
 var util = require('util')
 var mdns = require('multicast-dns')
@@ -30,6 +32,8 @@ module.exports = function (opts) {
       }]
     }
 
+    debug('lookup id %s record %j', id, record)
+
     if (external) external.query(record, tracker)
     if (internal) internal.query(record, cb)
     else if (cb) process.nextTick(cb)
@@ -55,6 +59,8 @@ module.exports = function (opts) {
 
     add(id, peer)
 
+    debug('announce id %s record %j', id, record)
+
     if (external) external.respond(record, tracker, cb)
     else if (cb) process.nextTick(cb)
   }
@@ -68,6 +74,8 @@ module.exports = function (opts) {
     if (!store) return
     var rec = store.byaddr[addr]
     if (rec) store.remove(rec)
+
+    debug('unannounce id %s record %j', id, rec)
   }
 
   discover.listen = function (port, cb) {
@@ -76,6 +84,8 @@ module.exports = function (opts) {
     server = mdns({multicast: false, port: port || 53})
     ondnssocket(server, true)
     if (cb) server.on('ready', cb)
+
+    debug('listen port %s', port)
   }
 
   discover.destroy = function (cb) {
@@ -106,6 +116,8 @@ module.exports = function (opts) {
   function ondnssocket (socket, external) {
     socket.on('query', function (query, rinfo) {
       var answers = []
+
+      debug('dns got query %j', query)
 
       for (var i = 0; i < query.questions.length; i++) {
         var q = query.questions[i]
@@ -149,6 +161,8 @@ module.exports = function (opts) {
     })
 
     socket.on('response', function (response, rinfo) {
+      debug('dns got response %j %j', response, rinfo)
+
       for (var i = 0; i < response.answers.length; i++) answer(response.answers[i], rinfo)
       for (var j = 0; j < response.additionals.length; j++) answer(response.additionals[j], rinfo)
     })
@@ -156,6 +170,8 @@ module.exports = function (opts) {
     function answer (a, rinfo) {
       if (a.type !== 'SRV') return
       if (a.name.slice(-suffix.length) !== suffix) return
+
+      debug('dns forge answer %j %j', a, rinfo)
 
       discover.emit('peer', a.name.slice(0, -suffix.length), {
         local: !external,
@@ -239,6 +255,7 @@ Store.prototype.add = function (name) {
   recs.node = this._active.push(recs)
   recs.on('add', this._onadd)
   recs.on('remove', this._onremove)
+  debug('store added %j', name)
   return recs
 }
 
