@@ -161,7 +161,6 @@ module.exports = function (opts) {
     })
 
     socket.on('response', function (response, rinfo) {
-      debug('dns got announce %j %j', response, rinfo)
 
       for (var i = 0; i < response.answers.length; i++) answer(response.answers[i], rinfo)
       for (var j = 0; j < response.additionals.length; j++) answer(response.additionals[j], rinfo)
@@ -171,7 +170,7 @@ module.exports = function (opts) {
       if (a.type !== 'SRV') return
       if (a.name.slice(-suffix.length) !== suffix) return
 
-      debug('dns emit peer %j %j', a, rinfo)
+      debug('dns got answer %j %j', response, rinfo)
 
       discover.emit('peer', a.name.slice(0, -suffix.length), {
         local: !external,
