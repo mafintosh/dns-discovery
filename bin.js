@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+var pkg = require('./package.json')
+require('@maboiteaspam/set-verbosity')(pkg.name, process.argv)
 var discovery = require('./')
 var minimist = require('minimist')
 
@@ -16,11 +18,11 @@ if (cmd === 'listen') {
 } else if (cmd === 'lookup') {
   disc.on('peer', onpeer)
   lookup()
-  setInterval(lookup, 1000)
+  setInterval(lookup, argv.heartbeat || 1000)
 } else if (cmd === 'announce') {
   if (!argv.port) throw new Error('You need to specify --port')
   announce()
-  setInterval(announce, 1000)
+  setInterval(announce, argv.heartbeat || 1000)
 } else {
   console.error(
     'dns-discovery [command]\n' +
@@ -29,11 +31,15 @@ if (cmd === 'listen') {
     '    --host=(optional host)\n' +
     '    --peer=(optional peer-id)\n' +
     '    --tracker=(optional tracker)\n' +
+    '    --heartbeat=(time interval in milliseconds)\n' +
     '  lookup [name]\n' +
-    '     --tracker=(optional tracker)\n' +
+    '    --tracker=(optional tracker)\n' +
+    '    --heartbeat=(time interval in milliseconds)\n' +
     '  listen\n' +
-    '     --port=(optional port)\n' +
-    '     --ttl=(optional ttl in seconds)\n'
+    '    --port=(optional port)\n' +
+    '    --ttl=(optional ttl in seconds)\n' +
+    '\n' +
+    '  -v|--verbose=(optional modules)\n'
   )
   process.exit(1)
 }

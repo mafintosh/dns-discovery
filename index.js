@@ -1,3 +1,5 @@
+var pkg = require('./package.json')
+var debug = require('debug')(pkg.name)
 var fifo = require('fifo')
 var util = require('util')
 var mdns = require('multicast-dns')
@@ -30,6 +32,9 @@ module.exports = function (opts) {
       }]
     }
 
+    debug('127.0.0.1:- lookup for %s', id)
+    debug('record %j', record)
+
     if (external) external.query(record, tracker)
     if (internal) internal.query(record, cb)
     else if (cb) process.nextTick(cb)
@@ -55,6 +60,10 @@ module.exports = function (opts) {
 
     add(id, peer)
 
+    debug('%s', new Date().getTime())
+    debug('127.0.0.1:- announce %s at %s:%s', id, peer.host, peer.port)
+    debug('record %j', record)
+
     if (external) external.respond(record, tracker, cb)
     else if (cb) process.nextTick(cb)
   }
@@ -68,6 +77,10 @@ module.exports = function (opts) {
     if (!store) return
     var rec = store.byaddr[addr]
     if (rec) store.remove(rec)
+
+    debug('%s:%s unannounce %s', peer.host, peer.port, id)
+    debug('record was %j', rec)
+    debug('%s', new Date().getTime())
   }
 
   discover.listen = function (port, cb) {
@@ -76,6 +89,8 @@ module.exports = function (opts) {
     server = mdns({multicast: false, port: port || 53})
     ondnssocket(server, true)
     if (cb) server.on('ready', cb)
+
+    debug('listen port %s', port)
   }
 
   discover.destroy = function (cb) {
@@ -106,6 +121,10 @@ module.exports = function (opts) {
   function ondnssocket (socket, external) {
     socket.on('query', function (query, rinfo) {
       var answers = []
+
+      query.questions.length>0 &&
+      debug('%s:%s is looking for %s, q(size=%s)',
+        rinfo.address, rinfo.port, query.questions[0].name, rinfo.size)
 
       for (var i = 0; i < query.questions.length; i++) {
         var q = query.questions[i]
@@ -149,6 +168,7 @@ module.exports = function (opts) {
     })
 
     socket.on('response', function (response, rinfo) {
+
       for (var i = 0; i < response.answers.length; i++) answer(response.answers[i], rinfo)
       for (var j = 0; j < response.additionals.length; j++) answer(response.additionals[j], rinfo)
     })
@@ -156,6 +176,9 @@ module.exports = function (opts) {
     function answer (a, rinfo) {
       if (a.type !== 'SRV') return
       if (a.name.slice(-suffix.length) !== suffix) return
+
+      debug('%s:%s resolves about %s', rinfo.address, rinfo.port, a.name)
+      debug('response %j', a)
 
       discover.emit('peer', a.name.slice(0, -suffix.length), {
         local: !external,
@@ -239,6 +262,7 @@ Store.prototype.add = function (name) {
   recs.node = this._active.push(recs)
   recs.on('add', this._onadd)
   recs.on('remove', this._onremove)
+  debug('store added %j', name)
   return recs
 }
 
@@ -289,6 +313,7 @@ Records.prototype.remove = function (container) {
     this.records[last.index] = last
   }
   this.emit('remove', container)
+  debug('store removed %j', container)
 }
 
 Records.prototype.random = function (prev) {
