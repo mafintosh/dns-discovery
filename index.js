@@ -32,7 +32,8 @@ module.exports = function (opts) {
       }]
     }
 
-    debug('lookup id %s record %j', id, record)
+    debug('127.0.0.1:- lookup for %s', id)
+    debug('record %j', record)
 
     if (external) external.query(record, tracker)
     if (internal) internal.query(record, cb)
@@ -59,7 +60,9 @@ module.exports = function (opts) {
 
     add(id, peer)
 
-    debug('announce id %s record %j', id, record)
+    debug('%s', new Date().getTime())
+    debug('127.0.0.1:- announce %s at %s:%s', id, peer.host, peer.port)
+    debug('record %j', record)
 
     if (external) external.respond(record, tracker, cb)
     else if (cb) process.nextTick(cb)
@@ -75,7 +78,9 @@ module.exports = function (opts) {
     var rec = store.byaddr[addr]
     if (rec) store.remove(rec)
 
-    debug('unannounce id %s record %j', id, rec)
+    debug('%s:%s unannounce %s', peer.host, peer.port, id)
+    debug('record was %j', rec)
+    debug('%s', new Date().getTime())
   }
 
   discover.listen = function (port, cb) {
@@ -117,7 +122,9 @@ module.exports = function (opts) {
     socket.on('query', function (query, rinfo) {
       var answers = []
 
-      debug('dns got query %j', query)
+      query.questions.length>0 &&
+      debug('%s:%s is looking for %s, q(size=%s)',
+        rinfo.address, rinfo.port, query.questions[0].name, rinfo.size)
 
       for (var i = 0; i < query.questions.length; i++) {
         var q = query.questions[i]
@@ -170,7 +177,8 @@ module.exports = function (opts) {
       if (a.type !== 'SRV') return
       if (a.name.slice(-suffix.length) !== suffix) return
 
-      debug('dns got answer %j %j', response, rinfo)
+      debug('%s:%s resolves about %s', rinfo.address, rinfo.port, a.name)
+      debug('response %j', a)
 
       discover.emit('peer', a.name.slice(0, -suffix.length), {
         local: !external,
