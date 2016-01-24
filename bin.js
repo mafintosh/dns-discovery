@@ -4,7 +4,7 @@ var discovery = require('./')
 var minimist = require('minimist')
 
 var argv = minimist(process.argv.slice(2), {
-  alias: {port: 'p', host: 'h', tracker: 't'}
+  alias: {port: 'p', host: 'h', server: 's'}
 })
 
 var rcvd = {}
@@ -28,9 +28,9 @@ if (cmd === 'listen') {
     '    --port=(port)\n' +
     '    --host=(optional host)\n' +
     '    --peer=(optional peer-id)\n' +
-    '    --tracker=(optional tracker)\n' +
+    '    --server=(optional discovery server)\n' +
     '  lookup [name]\n' +
-    '     --tracker=(optional tracker)\n' +
+    '     --server=(optional discovery server)\n' +
     '  listen\n' +
     '     --port=(optional port)\n' +
     '     --ttl=(optional ttl in seconds)\n'

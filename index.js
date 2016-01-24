@@ -8,13 +8,13 @@ module.exports = function (opts) {
   if (!opts) opts = {}
 
   var discover = new events.EventEmitter()
-  var tracker = opts.tracker && parse(opts.tracker)
+  var discoveryServer = opts.server && parse(opts.server)
   var suffix = '.' + (opts.domain || 'dns-discovery.local')
   var host = opts.host
   var ttl = opts.ttl || 0
-  var external = tracker && mdns({multicast: false, port: 0})
+  var external = discoveryServer && mdns({multicast: false, port: 0})
   var internal = opts.multicast !== false && mdns()
-  var server = null
+  var dnsServer = null
   var domains = new Store(opts)
 
   if (external) ondnssocket(external, true)
@@ -30,7 +30,7 @@ module.exports = function (opts) {
       }]
     }
 
-    if (external) external.query(record, tracker)
+    if (external) external.query(record, discoveryServer)
     if (internal) internal.query(record, cb)
     else if (cb) process.nextTick(cb)
   }
@@ -55,7 +55,7 @@ module.exports = function (opts) {
 
     add(id, peer)
 
-    if (external) external.respond(record, tracker, cb)
+    if (external) external.respond(record, discoveryServer, cb)
     else if (cb) process.nextTick(cb)
   }
 
@@ -71,11 +71,11 @@ module.exports = function (opts) {
   }
 
   discover.listen = function (port, cb) {
-    if (server) throw new Error('Already listening')
+    if (dnsServer) throw new Error('Already listening')
     discover.on('peer', add)
-    server = mdns({multicast: false, port: port || 53})
-    ondnssocket(server, true)
-    if (cb) server.on('ready', cb)
+    dnsServer = mdns({multicast: false, port: port || 53})
+    ondnssocket(dnsServer, true)
+    if (cb) dnsServer.on('ready', cb)
   }
 
   discover.destroy = function (cb) {
@@ -88,7 +88,7 @@ module.exports = function (opts) {
     }
 
     function onexternaldestroy () {
-      if (server) server.destroy(cb)
+      if (dnsServer) dnsServer.destroy(cb)
       else if (cb) process.nextTick(cb)
     }
   }

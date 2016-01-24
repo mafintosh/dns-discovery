@@ -19,13 +19,13 @@ freePort(function (port) {
     disc.lookup(appName)
   })
 
-  tape('discovers only using tracker', function (t) {
+  tape('discovers only using server', function (t) {
     t.plan(4)
 
-    var tracker = discovery({multicast: false})
-    var client = discovery({multicast: false, tracker: 'localhost:' + port})
+    var server = discovery({multicast: false})
+    var client = discovery({multicast: false, server: 'localhost:' + port})
 
-    tracker.on('peer', function (name, peer) {
+    server.on('peer', function (name, peer) {
       t.same(name, 'hello-world')
       t.same(peer, {host: '127.0.0.1', port: 8080, local: false})
     })
@@ -33,11 +33,11 @@ freePort(function (port) {
     client.on('peer', function (name, peer) {
       t.same(name, 'hello-world')
       t.same(peer, {host: '127.0.0.1', port: 8080, local: false})
-      tracker.destroy()
+      server.destroy()
       client.destroy()
     })
 
-    tracker.listen(port, function () {
+    server.listen(port, function () {
       client.announce('hello-world', {port: 8080, host: '127.0.0.1'}, function () {
         client.lookup('hello-world')
       })
@@ -45,12 +45,12 @@ freePort(function (port) {
   })
 
   tape('limit', function (t) {
-    var tracker = discovery({multicast: false, limit: 1})
+    var server = discovery({multicast: false, limit: 1})
 
-    tracker.announce('hello-world', {port: 8080, host: '127.0.0.1'})
-    tracker.announce('hello-world-2', {port: 8081, host: '127.0.0.1'})
+    server.announce('hello-world', {port: 8080, host: '127.0.0.1'})
+    server.announce('hello-world-2', {port: 8081, host: '127.0.0.1'})
 
-    var domains = tracker.toJSON()
+    var domains = server.toJSON()
     t.same(domains.length, 1)
     t.same(domains[0].records.length, 1)
     t.end()
