@@ -4,6 +4,7 @@
   "description": "Discovery peers in a distributed system using regular dns and multicast dns.",
   "main": "index.js",
   "dependencies": {
+    "debug": "^2.2.0",
     "fifo": "^2.3.0",
     "minimist": "^1.2.0",
     "multicast-dns": "^5.0.0",

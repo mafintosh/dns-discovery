@@ -3,6 +3,7 @@ var util = require('util')
 var mdns = require('multicast-dns')
 var addr = require('network-address')
 var events = require('events')
+var debug = require('debug')('dns-discovery')
 
 module.exports = function (opts) {
   if (!opts) opts = {}
@@ -30,6 +31,8 @@ module.exports = function (opts) {
       }]
     }
 
+    debug('looking up %s', id)
+
     if (external) external.query(record, discoveryServer)
     if (internal) internal.query(record, cb)
     else if (cb) process.nextTick(cb)
@@ -53,6 +56,7 @@ module.exports = function (opts) {
       }]
     }
 
+    debug('announcing %s:%p for %s', peer.host, peer.port, id)
     add(id, peer)
 
     if (external) external.respond(record, discoveryServer, cb)
@@ -109,6 +113,7 @@ module.exports = function (opts) {
 
       for (var i = 0; i < query.questions.length; i++) {
         var q = query.questions[i]
+        debug('received dns query for %s', q.name)
         if (q.name.slice(-suffix.length) !== suffix) continue
 
         var store = domains.get(q.name)
