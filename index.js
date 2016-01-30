@@ -143,7 +143,7 @@ module.exports = function (opts) {
                 type: 'A',
                 name: q.name,
                 ttl: ttl,
-                data: peer.host || addr()
+                data: peer.host === '0.0.0.0' ? addr() : peer.host
               })
               break
           }
