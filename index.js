@@ -1,7 +1,6 @@
 var fifo = require('fifo')
 var util = require('util')
 var mdns = require('multicast-dns')
-var addr = require('network-address')
 var events = require('events')
 var debug = require('debug')('dns-discovery')
 
@@ -132,7 +131,7 @@ module.exports = function (opts) {
                 name: q.name,
                 ttl: ttl,
                 data: {
-                  target: peer.host === '0.0.0.0' ? addr() : peer.host,
+                  target: peer.host,
                   port: peer.port
                 }
               })
@@ -143,7 +142,7 @@ module.exports = function (opts) {
                 type: 'A',
                 name: q.name,
                 ttl: ttl,
-                data: peer.host === '0.0.0.0' ? addr() : peer.host
+                data: peer.host
               })
               break
           }
