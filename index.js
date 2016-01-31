@@ -2,6 +2,7 @@ var fifo = require('fifo')
 var util = require('util')
 var mdns = require('multicast-dns')
 var events = require('events')
+var address = require('network-address')
 var debug = require('debug')('dns-discovery')
 
 module.exports = function (opts) {
@@ -55,7 +56,7 @@ module.exports = function (opts) {
       }]
     }
 
-    debug('announcing %s:%p for %s', peer.host, peer.port, id)
+    debug('announcing %s:%d for %s', peer.host, peer.port, id)
     add(id, peer)
 
     if (external) external.respond(record, discoveryServer, cb)
@@ -137,12 +138,12 @@ module.exports = function (opts) {
               })
               break
 
-            case 'A':
+            case 'A': // mostly for debugging
               answers.push({
                 type: 'A',
                 name: q.name,
-                ttl: ttl,
-                data: peer.host
+                ttl: ttl || 30,
+                data: peer.host === '0.0.0.0' ? address() : peer.host
               })
               break
           }
