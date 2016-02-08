@@ -165,7 +165,7 @@ module.exports = function (opts) {
       discover.emit('peer', a.name.slice(0, -suffix.length), {
         local: !external,
         host: a.data.target === '0.0.0.0' ? rinfo.address : a.data.target,
-        port: a.data.port
+        port: a.data.port || rinfo.port
       })
     }
   }
