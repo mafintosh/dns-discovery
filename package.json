@@ -7,7 +7,7 @@
     "debug": "^2.2.0",
     "fifo": "^2.3.0",
     "minimist": "^1.2.0",
-    "multicast-dns": "^5.0.0",
+    "multicast-dns": "^5.4.0",
     "network-address": "^1.0.0"
   },
   "devDependencies": {

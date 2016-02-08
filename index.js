@@ -13,7 +13,7 @@ module.exports = function (opts) {
   var suffix = '.' + (opts.domain || 'dns-discovery.local')
   var host = opts.host
   var ttl = opts.ttl || 0
-  var external = discoveryServers && mdns({multicast: false, port: 0})
+  var external = discoveryServers && mdns({multicast: false, port: 0, socket: opts.socket})
   var internal = opts.multicast !== false && mdns()
   var dnsServer = null
   var domains = new Store(opts)
