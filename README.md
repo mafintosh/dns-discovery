@@ -42,6 +42,17 @@ Create a new discovery instance. Options include:
 }
 ```
 
+If you have more than one discovery server you can specify an array
+
+``` js
+{
+  server: [
+    'discovery.example.com:9090',
+    'another.discovery.example.com'
+  ]
+}
+```
+
 #### `disc.lookup(name, [callback])`
 
 Do a lookup for a specific app name. When new peers are discovered for this name peer events will be emitted

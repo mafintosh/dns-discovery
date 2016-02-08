@@ -9,11 +9,11 @@ module.exports = function (opts) {
   if (!opts) opts = {}
 
   var discover = new events.EventEmitter()
-  var discoveryServer = opts.server && parse(opts.server)
+  var discoveryServers = opts.server && parse(opts.server)
   var suffix = '.' + (opts.domain || 'dns-discovery.local')
   var host = opts.host
   var ttl = opts.ttl || 0
-  var external = discoveryServer && mdns({multicast: false, port: 0})
+  var external = discoveryServers && mdns({multicast: false, port: 0})
   var internal = opts.multicast !== false && mdns()
   var dnsServer = null
   var domains = new Store(opts)
@@ -24,6 +24,9 @@ module.exports = function (opts) {
   discover.lookup = function (id, cb) {
     if (Buffer.isBuffer(id)) id = id.toString('hex')
 
+    var error = null
+    var missing = 0
+
     var record = {
       questions: [{
         type: 'SRV',
@@ -33,9 +36,25 @@ module.exports = function (opts) {
 
     debug('looking up %s', id)
 
-    if (external) external.query(record, discoveryServer)
-    if (internal) internal.query(record, cb)
-    else if (cb) process.nextTick(cb)
+    if (external) {
+      for (var i = 0; i < discoveryServers.length; i++) {
+        missing++
+        external.query(record, discoveryServers[i], done)
+      }
+    }
+
+    if (internal) {
+      missing++
+      internal.query(record, done)
+    }
+
+    missing++
+    process.nextTick(done)
+
+    function done (err) {
+      if (err) error = err
+      if (!--missing && cb) cb(error)
+    }
   }
 
   discover.announce = function (id, peer, cb) {
@@ -43,6 +62,9 @@ module.exports = function (opts) {
     if (Buffer.isBuffer(id)) id = id.toString('hex')
 
     if (!peer.host) peer.host = host || '0.0.0.0'
+
+    var error = null
+    var missing = 0
 
     var record = {
       answers: [{
@@ -59,8 +81,20 @@ module.exports = function (opts) {
     debug('announcing %s:%d for %s', peer.host, peer.port, id)
     add(id, peer)
 
-    if (external) external.respond(record, discoveryServer, cb)
-    else if (cb) process.nextTick(cb)
+    if (external) {
+      for (var i = 0; i < discoveryServers.length; i++) {
+        missing++
+        external.respond(record, discoveryServers[i], done)
+      }
+    }
+
+    missing++
+    process.nextTick(done)
+
+    function done (err) {
+      if (err) error = err
+      if (!--missing && cb) cb(error)
+    }
   }
 
   discover.unannounce = function (id, peer) {
@@ -171,11 +205,15 @@ module.exports = function (opts) {
   }
 }
 
-function parse (host) {
-  return {
-    port: Number(host.split(':')[1] || 53),
-    address: host.split(':')[0]
-  }
+function parse (hosts) {
+  if (!Array.isArray(hosts)) hosts = [hosts]
+
+  return hosts.map(function (host) {
+    return {
+      port: Number(host.split(':')[1] || 53),
+      address: host.split(':')[0]
+    }
+  })
 }
 
 function Store (opts) {

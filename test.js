@@ -44,6 +44,31 @@ freePort(function (port) {
     })
   })
 
+  tape('discovers only using multiple servers', function (t) {
+    t.plan(6)
+
+    var server = discovery({multicast: false})
+    var client = discovery({multicast: false, server: ['localhost:' + port, 'localhost:' + port]})
+
+    server.on('peer', function (name, peer) {
+      t.same(name, 'hello-world')
+      t.same(peer, {host: '127.0.0.1', port: 8080, local: false})
+    })
+
+    client.on('peer', function (name, peer) {
+      t.same(name, 'hello-world')
+      t.same(peer, {host: '127.0.0.1', port: 8080, local: false})
+      server.destroy()
+      client.destroy()
+    })
+
+    server.listen(port, function () {
+      client.announce('hello-world', {port: 8080, host: '127.0.0.1'}, function () {
+        client.lookup('hello-world')
+      })
+    })
+  })
+
   tape('limit', function (t) {
     var server = discovery({multicast: false, limit: 1})
 
