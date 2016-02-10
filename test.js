@@ -80,6 +80,29 @@ freePort(function (port) {
     t.same(domains[0].records.length, 1)
     t.end()
   })
+
+  tape('push', function (t) {
+    var server = discovery({multicast: false, push: true})
+    var client1 = discovery({multicast: false, server: 'localhost:' + port})
+    var client2 = discovery({multicast: false, server: 'localhost:' + port})
+
+    server.listen(port, function () {
+      server.once('peer', function () {
+        client2.announce('hello-world', 8081)
+      })
+      client1.lookup('hello-world')
+      client1.announce('hello-world', 8080)
+      client1.on('peer', function (id, peer) {
+        if (peer.port === 8081) {
+          client1.destroy()
+          client2.destroy()
+          server.destroy()
+          t.pass('got peer')
+          t.end()
+        }
+      })
+    })
+  })
 })
 
 function freePort (cb) {

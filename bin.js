@@ -32,6 +32,7 @@ if (cmd === 'listen') {
     '  lookup [name]\n' +
     '     --server=(optional discovery server)\n' +
     '  listen\n' +
+    '     --push\n' +
     '     --port=(optional port)\n' +
     '     --ttl=(optional ttl in seconds)\n'
   )

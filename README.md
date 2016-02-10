@@ -38,6 +38,7 @@ Create a new discovery instance. Options include:
   ttl: someSeconds, // ttl for records in seconds. defaults to Infinity.
   limit: someLimit, // max number of records stored. defaults to 10000.
   multicast: true, // use multicast-dns. defaults to true.
+  push: false, // server will push out records as they arrive. defaults to false
   domain: 'my-domain.com' // top-level domain to use for records. defaults to dns-discovery.local
 }
 ```

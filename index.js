@@ -1,9 +1,8 @@
-var fifo = require('fifo')
-var util = require('util')
 var mdns = require('multicast-dns')
 var events = require('events')
 var address = require('network-address')
 var debug = require('debug')('dns-discovery')
+var store = require('./store')
 
 module.exports = function (opts) {
   if (!opts) opts = {}
@@ -16,10 +15,14 @@ module.exports = function (opts) {
   var external = discoveryServers && mdns({multicast: false, port: 0, socket: opts.socket})
   var internal = opts.multicast !== false && mdns()
   var dnsServer = null
-  var domains = new Store(opts)
 
-  if (external) ondnssocket(external, true)
-  if (internal) ondnssocket(internal, false)
+  var domains = store(opts)
+  var pushOpts = opts.push === true ? {} : opts.push
+  if (pushOpts && !pushOpts.ttl) pushOpts.ttl = opts.ttl || 60
+  var push = pushOpts && store(pushOpts)
+
+  if (external) ondnssocket(external, true, false)
+  if (internal) ondnssocket(internal, false, false)
 
   discover.lookup = function (id, cb) {
     if (Buffer.isBuffer(id)) id = id.toString('hex')
@@ -100,19 +103,15 @@ module.exports = function (opts) {
   discover.unannounce = function (id, peer) {
     var port = typeof peer === 'number' ? peer : peer.port
     var host = (typeof peer === 'number' ? host : peer.host) || '0.0.0.0'
-    var addr = host + ':' + port
 
-    var store = domains.get(id)
-    if (!store) return
-    var rec = store.byaddr[addr]
-    if (rec) store.remove(rec)
+    domains.remove(id + suffix, port, host)
   }
 
   discover.listen = function (port, cb) {
     if (dnsServer) throw new Error('Already listening')
     discover.on('peer', add)
     dnsServer = mdns({multicast: false, port: port || 53})
-    ondnssocket(dnsServer, true)
+    ondnssocket(dnsServer, true, true)
     if (cb) dnsServer.on('ready', cb)
   }
 
@@ -138,10 +137,29 @@ module.exports = function (opts) {
   return discover
 
   function add (name, peer) {
-    domains.add(name + suffix).add(peer)
+    domains.add(name + suffix, peer.port, peer.host)
+
+    if (!push || !dnsServer) return
+
+    var pushes = push.get(name + suffix, 10)
+    var record = {
+      answers: [{
+        type: 'SRV',
+        name: name + suffix,
+        ttl: ttl,
+        data: {
+          target: peer.host,
+          port: peer.port
+        }
+      }]
+    }
+
+    for (var i = 0; i < pushes.length; i++) {
+      dnsServer.respond(record, {port: pushes[i].port, address: pushes[i].host})
+    }
   }
 
-  function ondnssocket (socket, external) {
+  function ondnssocket (socket, external, server) {
     socket.on('query', function (query, rinfo) {
       var answers = []
 
@@ -149,15 +167,13 @@ module.exports = function (opts) {
         var q = query.questions[i]
         debug('received dns query for %s', q.name)
         if (q.name.slice(-suffix.length) !== suffix) continue
+        if (server && push) push.add(q.name, rinfo.port, rinfo.address)
 
-        var store = domains.get(q.name)
-        if (!store) continue
+        var peers = domains.get(q.name, 10)
 
-        var peer = null
-
-        while (answers.length < 10) {
-          peer = store.random(peer)
-          if (!peer) break
+        for (var j = 0; j < peers.length; j++) {
+          var port = peers[j].port
+          var host = peers[j].host
 
           switch (q.type) {
             case 'SRV':
@@ -166,8 +182,8 @@ module.exports = function (opts) {
                 name: q.name,
                 ttl: ttl,
                 data: {
-                  target: peer.host,
-                  port: peer.port
+                  target: host,
+                  port: port
                 }
               })
               break
@@ -177,7 +193,7 @@ module.exports = function (opts) {
                 type: 'A',
                 name: q.name,
                 ttl: ttl || 30,
-                data: peer.host === '0.0.0.0' ? address() : peer.host
+                data: host === '0.0.0.0' ? address() : host
               })
               break
           }
@@ -214,145 +230,4 @@ function parse (hosts) {
       address: host.split(':')[0]
     }
   })
-}
-
-function Store (opts) {
-  if (!opts) opts = {}
-
-  var self = this
-
-  this.limit = opts.limit || 10000
-  this.ttl = opts.ttl || 0
-  this.used = 0
-
-  this._domains = {}
-  this._active = fifo()
-  this._onremove = onremove
-  this._onadd = onadd
-
-  function onadd () {
-    self.used++
-    if (self.used > self.limit) {
-      var oldest = self._active.first()
-      if (oldest) oldest.remove(oldest.random())
-    }
-  }
-
-  function onremove () {
-    self.used--
-    if (this.count) return
-    delete self._domains[this.name]
-    self._active.remove(this.node)
-  }
-}
-
-Store.prototype.get = function (name) {
-  var recs = this._domains[name]
-  if (!recs) return null
-  this._active.bump(recs.node)
-  return recs
-}
-
-Store.prototype.toJSON = function () {
-  var self = this
-  var names = []
-
-  Object.keys(this._domains).forEach(function (name) {
-    names.push({
-      domain: name,
-      records: self._domains[name].records.map(map)
-    })
-  })
-
-  return names
-
-  function map (rec) {
-    return {
-      id: rec.id,
-      port: rec.port,
-      host: rec.host
-    }
-  }
-}
-
-Store.prototype.add = function (name) {
-  var recs = this._domains[name]
-  if (recs) return recs
-  recs = this._domains[name] = new Records(name, {ttl: this.ttl})
-  recs.node = this._active.push(recs)
-  recs.on('add', this._onadd)
-  recs.on('remove', this._onremove)
-  return recs
-}
-
-function Records (name, opts) {
-  if (!opts) opts = {}
-  this.count = 0
-  this.node = null
-  this.name = name
-  this.ttl = 1000 * (opts.ttl || 0)
-  this.records = []
-  this.byaddr = {}
-  events.EventEmitter.call(this)
-}
-
-util.inherits(Records, events.EventEmitter)
-
-Records.prototype.add = function (record) {
-  var addr = record.host + ':' + record.port
-  var old = this.byaddr[addr]
-
-  if (old) {
-    old.time = Date.now()
-    return old
-  }
-
-  var container = {
-    index: this.records.length,
-    host: record.host,
-    port: record.port,
-    time: Date.now()
-  }
-
-  this.count++
-  this.byaddr[addr] = container
-  this.records.push(container)
-  this.emit('add', container)
-
-  return container
-}
-
-Records.prototype.remove = function (container) {
-  var last = this.records.pop()
-  if (!last) return
-  this.count--
-  delete this.byaddr[container.host + ':' + container.port]
-  if (last !== container) {
-    last.index = container.index
-    this.records[last.index] = last
-  }
-  this.emit('remove', container)
-}
-
-Records.prototype.random = function (prev) {
-  var offset = prev ? prev.index + 1 : 0
-  while (true) {
-    if (offset >= this.records.length) return null
-    var index = Math.floor(Math.random() * (this.records.length - offset)) + offset
-    var chosen = this.records[index]
-    if (this.ttl && (Date.now() - chosen.time) > this.ttl) {
-      this.remove(chosen)
-      continue
-    }
-    this.swap(chosen, this.records[offset])
-    return chosen
-  }
-}
-
-Records.prototype.swap = function (a, b) {
-  var tmp = a.index
-  a.index = b.index
-  b.index = tmp
-  this.records[b.index] = b
-  this.records[a.index] = a
 }
