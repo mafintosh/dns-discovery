@@ -76,10 +76,12 @@ module.exports = function (opts) {
         ttl: ttl,
         data: {
           target: peer.host,
-          port: peer.port
+          port: peer.port || 0
         }
       }]
     }
+
+    if (!peer.port && opts.socket) peer.port = opts.socket.address().port
 
     debug('announcing %s:%d for %s', peer.host, peer.port, id)
     add(id, peer)
