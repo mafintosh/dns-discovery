@@ -140,7 +140,7 @@ module.exports = function (opts) {
 
   function add (name, peer) {
     domains.add(name + suffix, peer.port, peer.host)
-
+    debug('adding %s:%d for %s', peer.host, peer.port, name)
     if (!push || !dnsServer) return
 
     var pushes = push.get(name + suffix, 10)
