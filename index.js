@@ -163,9 +163,13 @@ module.exports = function (opts) {
 
   function ondnssocket (socket, external, server) {
     socket.on('query', function (query, rinfo) {
+      var i = 0
       var answers = []
 
-      for (var i = 0; i < query.questions.length; i++) {
+      for (i = 0; i < query.answers.length; i++) answer(query.answers[i], rinfo)
+      for (i = 0; i < query.additionals.length; i++) answer(query.additionals[i], rinfo)
+
+      for (i = 0; i < query.questions.length; i++) {
         var q = query.questions[i]
         debug('received dns query for %s', q.name)
         if (q.name.slice(-suffix.length) !== suffix) continue
@@ -206,8 +210,10 @@ module.exports = function (opts) {
     })
 
     socket.on('response', function (response, rinfo) {
-      for (var i = 0; i < response.answers.length; i++) answer(response.answers[i], rinfo)
-      for (var j = 0; j < response.additionals.length; j++) answer(response.additionals[j], rinfo)
+      var i = 0
+
+      for (i = 0; i < response.answers.length; i++) answer(response.answers[i], rinfo)
+      for (i = 0; i < response.additionals.length; i++) answer(response.additionals[i], rinfo)
     })
 
     function answer (a, rinfo) {
