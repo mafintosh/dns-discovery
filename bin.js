@@ -29,10 +29,10 @@ if (cmd === 'listen') {
     '    --host=(optional host)\n' +
     '    --peer=(optional peer-id)\n' +
     '    --server=(optional discovery server)\n' +
-    '    --domain=(optional authoritative domain)\n'
+    '    --domain=(optional authoritative domain)\n' +
     '  lookup [name]\n' +
     '    --server=(optional discovery server)\n' +
-    '    --domain=(optional authoritative domain)\n'
+    '    --domain=(optional authoritative domain)\n' +
     '  listen\n' +
     '    --push\n' +
     '    --port=(optional port)\n' +
