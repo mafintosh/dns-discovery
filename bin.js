@@ -4,7 +4,7 @@ var discovery = require('./')
 var minimist = require('minimist')
 
 var argv = minimist(process.argv.slice(2), {
-  alias: {port: 'p', host: 'h', server: 's'}
+  alias: {port: 'p', host: 'h', server: 's', domain: 'd'}
 })
 
 var rcvd = {}
@@ -29,12 +29,15 @@ if (cmd === 'listen') {
     '    --host=(optional host)\n' +
     '    --peer=(optional peer-id)\n' +
     '    --server=(optional discovery server)\n' +
+    '    --domain=(optional authoritative domain)\n'
     '  lookup [name]\n' +
-    '     --server=(optional discovery server)\n' +
+    '    --server=(optional discovery server)\n' +
+    '    --domain=(optional authoritative domain)\n'
     '  listen\n' +
-    '     --push\n' +
-    '     --port=(optional port)\n' +
-    '     --ttl=(optional ttl in seconds)\n'
+    '    --push\n' +
+    '    --port=(optional port)\n' +
+    '    --ttl=(optional ttl in seconds)\n' +
+    '    --domain=(optional authoritative domain)\n'
   )
   process.exit(1)
 }
