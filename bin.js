@@ -27,14 +27,12 @@ if (cmd === 'listen') {
     '  announce [name]\n' +
     '    --port=(port)\n' +
     '    --host=(optional host)\n' +
-    '    --peer=(optional peer-id)\n' +
     '    --server=(optional discovery server)\n' +
     '    --domain=(optional authoritative domain)\n' +
     '  lookup [name]\n' +
     '    --server=(optional discovery server)\n' +
     '    --domain=(optional authoritative domain)\n' +
     '  listen\n' +
-    '    --push\n' +
     '    --port=(optional port)\n' +
     '    --ttl=(optional ttl in seconds)\n' +
     '    --domain=(optional authoritative domain)\n'
@@ -47,7 +45,7 @@ function lookup () {
 }
 
 function announce () {
-  disc.announce(argv._[1], argv)
+  disc.announce(argv._[1], argv.port)
 }
 
 function onpeer (name, peer) {

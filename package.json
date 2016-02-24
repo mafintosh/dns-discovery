@@ -4,15 +4,16 @@
   "description": "Discovery peers in a distributed system using regular dns and multicast dns.",
   "main": "index.js",
   "dependencies": {
-    "debug": "^2.2.0",
+    "dns-socket": "^1.4.0",
     "lru": "^2.0.0",
+    "mdns-txt": "^2.0.0",
     "minimist": "^1.2.0",
     "multicast-dns": "^6.0.0",
-    "network-address": "^1.0.0",
+    "network-address": "^1.1.0",
     "unordered-set": "^1.1.0"
   },
   "devDependencies": {
-    "standard": "^5.4.1",
+    "standard": "^6.0.7",
     "tape": "^4.4.0"
   },
   "bin": {

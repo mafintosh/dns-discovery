@@ -114,6 +114,8 @@ function Peer (port, host) {
   this.host = host || '127.0.0.1'
   this.port = port
   this.address = this.host + ':' + this.port
+  this.buffer = null
+
   this._modified = 0
   this._index = 0
 }

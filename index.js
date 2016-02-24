@@ -1,241 +1,581 @@
-var mdns = require('multicast-dns')
+var dns = require('dns-socket')
 var events = require('events')
-var address = require('network-address')
-var debug = require('debug')('dns-discovery')
+var util = require('util')
+var crypto = require('crypto')
+var txt = require('mdns-txt')()
+var network = require('network-address')
+var multicast = require('multicast-dns')
 var store = require('./store')
 
-module.exports = function (opts) {
+var IPv4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}.\d{1,3}$/
+var PORT = /^\d{1,5}$/
+
+module.exports = Discovery
+
+function Discovery (opts) {
+  if (!(this instanceof Discovery)) return new Discovery(opts)
   if (!opts) opts = {}
 
-  var discover = new events.EventEmitter()
-  var discoveryServers = opts.server && parse(opts.server)
-  var suffix = '.' + (opts.domain || 'dns-discovery.local')
-  var host = opts.host
-  var ttl = opts.ttl || 0
-  var external = discoveryServers && mdns({multicast: false, port: 0, socket: opts.socket})
-  var internal = opts.multicast !== false && mdns()
-  var dnsServer = null
+  events.EventEmitter.call(this)
 
-  var domains = store(opts)
-  var pushOpts = opts.push === true ? {} : opts.push
-  if (pushOpts && !pushOpts.ttl) pushOpts.ttl = opts.ttl || 60
-  var push = pushOpts && store(pushOpts)
+  var self = this
 
-  if (external) ondnssocket(external, true, false)
-  if (internal) ondnssocket(internal, false, false)
+  this.socket = dns(opts)
+  this.servers = [].concat(opts.servers || opts.server || []).map(parseAddr)
 
-  discover.lookup = function (id, cb) {
-    if (Buffer.isBuffer(id)) id = id.toString('hex')
+  this._sockets = []
+  this._onsocket(this.socket)
 
-    var error = null
-    var missing = 0
+  this.multicast = opts.multicast !== false ? multicast() : null
+  if (this.multicast) {
+    this.multicast.on('query', onmulticastquery)
+    this.multicast.on('response', onmulticastresponse)
+    this.multicast.on('error', onerror)
+  }
 
-    var record = {
-      questions: [{
-        type: 'SRV',
-        name: id + suffix
-      }]
+  this._listening = false
+  this._id = crypto.randomBytes(32).toString('base64')
+  this._domain = opts.domain || 'dns-discovery.local'
+  this._pushDomain = 'push.' + this._domain
+  this._tokens = new Array(this.servers.length)
+  this._tokensAge = []
+  this._secrets = [
+    crypto.randomBytes(32),
+    crypto.randomBytes(32)
+  ]
+
+  while (this._tokensAge.length < this._tokens.length) this._tokensAge.push(0)
+
+  this._interval = setInterval(rotateSecrets, 5 * 60 * 1000)
+  if (this._interval.unref) this._interval.unref()
+
+  this._ttl = opts.ttl || 0
+  this._tick = 1
+
+  var push = opts.push || {}
+  if (!push.ttl) push.ttl = opts.ttl || 60
+  if (!push.limit) push.limit = opts.limit
+
+  this._domainStore = store(opts)
+  this._pushStore = store(push)
+
+  function rotateSecrets () {
+    self._rotateSecrets()
+  }
+
+  function onerror (err) {
+    self.emit('error', err)
+  }
+
+  function onmulticastquery (message, rinfo) {
+    self._onmulticastquery(message, rinfo.port, rinfo.address)
+  }
+
+  function onmulticastresponse (message, rinfo) {
+    self._onmulticastresponse(message, rinfo.port, rinfo.address)
+  }
+}
+
+util.inherits(Discovery, events.EventEmitter)
+
+Discovery.prototype.toJSON = function () {
+  return this._domainStore.toJSON()
+}
+
+Discovery.prototype._onsocket = function (socket) {
+  var self = this
+
+  this._sockets.push(socket)
+  socket.on('query', onquery)
+  socket.on('error', onerror)
+
+  function onerror (err) {
+    self.emit('error', err)
+  }
+
+  function onquery (message, port, host) {
+    self._onquery(message, port, host)
+  }
+}
+
+Discovery.prototype._rotateSecrets = function () {
+  if (this._listening) {
+    this._secrets.shift()
+    this._secrets.push(crypto.randomBytes(32))
+  }
+
+  for (var i = 0; i < this._tokensAge.length; i++) {
+    if (this._tokensAge[i] < this._tick) {
+      this._tokens[i] = null
+      this._tokensAge[i] = 0
+    }
+  }
+
+  this._tick++
+}
+
+Discovery.prototype._onmulticastquery = function (query, port, host) {
+  var reply = {questions: query.questions, answers: []}
+  var i = 0
+
+  for (i = 0; i < query.questions.length; i++) {
+    this._onquestion(query.questions[i], port, host, reply.answers, true)
+  }
+  for (i = 0; i < query.answers.length; i++) {
+    this._onanswer(query.answers[i], port, host)
+  }
+  for (i = 0; i < query.additionals.length; i++) {
+    this._onanswer(query.additionals[i], port, host)
+  }
+
+  if (reply.answers.length) {
+    this.multicast.response(reply)
+  }
+}
+
+Discovery.prototype._onmulticastresponse = function (response, port, host) {
+  var i = 0
+
+  for (i = 0; i < response.answers.length; i++) {
+    this._onanswer(response.answers[i], port, host)
+  }
+  for (i = 0; i < response.additionals.length; i++) {
+    this._onanswer(response.additionals[i], port, host)
+  }
+}
+
+Discovery.prototype._onanswer = function (answer, port, host) {
+  var id = this._getId(answer.name)
+  if (!id) return
+
+  if (answer.type === 'SRV') {
+    if (!IPv4.test(answer.data.target)) return
+    var peer = {
+      port: answer.data.port || port,
+      host: answer.data.target === '0.0.0.0' ? host : answer.data.target
+    }
+    this.emit('peer', id, peer)
+    return
+  }
+
+  if (answer.type === 'TXT') {
+    try {
+      var data = txt.decode(answer.data)
+    } catch (err) {
+      return
     }
 
-    debug('looking up %s', id)
+    var tokenMatch = data.token === hash(this._secrets[1], host)
 
-    if (external) {
-      for (var i = 0; i < discoveryServers.length; i++) {
-        missing++
-        external.query(record, discoveryServers[i], done)
+    if (!tokenMatch) {
+      // not an echo
+      this._parsePeers(id, data, host)
+    }
+
+    if (!this._listening) return
+
+    if (!tokenMatch) {
+      // check if old token matches
+      if (data.token !== hash(this._secrets[0], host)) return
+    }
+
+    if (PORT.test(data.announce)) {
+      var announce = Number(data.announce) || port
+      this.emit('peer', id, {port: announce, host: host})
+      this._domainStore.add(id, announce, host)
+      this._push(id, announce, host)
+    }
+
+    if (data.subscribe) {
+      this._pushStore.add(id, port, host)
+    }
+  }
+}
+
+Discovery.prototype._push = function (id, port, host) {
+  var subs = this._pushStore.get(id, 16)
+  var query = {
+    additionals: [{
+      type: 'SRV',
+      name: id + '.' + this._domain,
+      ttl: this._ttl,
+      data: {
+        port: port,
+        target: host
       }
-    }
-
-    if (internal) {
-      missing++
-      internal.query(record, done)
-    }
-
-    missing++
-    process.nextTick(done)
-
-    function done (err) {
-      if (err) error = err
-      if (!--missing && cb) cb(error)
-    }
+    }]
   }
 
-  discover.announce = function (id, peer, cb) {
-    if (typeof peer === 'number') peer = {port: peer}
-    if (Buffer.isBuffer(id)) id = id.toString('hex')
-
-    if (!peer.host) peer.host = host || '0.0.0.0'
-
-    var error = null
-    var missing = 0
-
-    var record = {
-      answers: [{
-        type: 'SRV',
-        name: id + suffix,
-        ttl: ttl,
-        data: {
-          target: peer.host,
-          port: peer.port || 0
-        }
-      }]
-    }
-
-    if (!peer.port && opts.socket) peer.port = opts.socket.address().port
-
-    debug('announcing %s:%d for %s', peer.host, peer.port, id)
-    add(id, peer)
-
-    if (external) {
-      for (var i = 0; i < discoveryServers.length; i++) {
-        missing++
-        external.respond(record, discoveryServers[i], done)
-      }
-    }
-
-    missing++
-    process.nextTick(done)
-
-    function done (err) {
-      if (err) error = err
-      if (!--missing && cb) cb(error)
-    }
+  for (var i = 0; i < subs.length; i++) {
+    var peer = subs[i]
+    var tid = this.socket.query(query, peer.port, peer.host)
+    this.socket.setRetries(tid, 2)
   }
+}
 
-  discover.unannounce = function (id, peer) {
-    var port = typeof peer === 'number' ? peer : peer.port
-    var host = (typeof peer === 'number' ? host : peer.host) || '0.0.0.0'
-
-    domains.remove(id + suffix, port, host)
-  }
-
-  discover.listen = function (port, cb) {
-    if (dnsServer) throw new Error('Already listening')
-    discover.on('peer', add)
-    dnsServer = mdns({multicast: false, port: port || 53})
-    ondnssocket(dnsServer, true, true)
-    if (cb) dnsServer.on('ready', cb)
-  }
-
-  discover.destroy = function (cb) {
-    if (internal) internal.destroy(oninternaldestroy)
-    else oninternaldestroy()
-
-    function oninternaldestroy () {
-      if (external) external.destroy(onexternaldestroy)
-      else onexternaldestroy()
-    }
-
-    function onexternaldestroy () {
-      if (dnsServer) dnsServer.destroy(cb)
-      else if (cb) process.nextTick(cb)
-    }
-  }
-
-  discover.toJSON = function () {
-    return domains.toJSON()
-  }
-
-  return discover
-
-  function add (name, peer) {
-    domains.add(name + suffix, peer.port, peer.host)
-    debug('adding %s:%d for %s', peer.host, peer.port, name)
-    if (!push || !dnsServer) return
-
-    var pushes = push.get(name + suffix, 10)
-    var record = {
-      answers: [{
-        type: 'SRV',
-        name: name + suffix,
-        ttl: ttl,
-        data: {
-          target: peer.host,
-          port: peer.port
-        }
-      }]
-    }
-
-    for (var i = 0; i < pushes.length; i++) {
-      dnsServer.respond(record, {port: pushes[i].port, address: pushes[i].host})
-    }
-  }
-
-  function ondnssocket (socket, external, server) {
-    socket.on('query', function (query, rinfo) {
-      var i = 0
-      var answers = []
-
-      for (i = 0; i < query.answers.length; i++) answer(query.answers[i], rinfo)
-      for (i = 0; i < query.additionals.length; i++) answer(query.additionals[i], rinfo)
-
-      for (i = 0; i < query.questions.length; i++) {
-        var q = query.questions[i]
-        debug('received dns query for %s', q.name)
-        if (q.name.slice(-suffix.length) !== suffix) continue
-        if (server && push) push.add(q.name, rinfo.port, rinfo.address)
-
-        var peers = domains.get(q.name, 10)
-
-        for (var j = 0; j < peers.length; j++) {
-          var port = peers[j].port
-          var host = peers[j].host
-
-          switch (q.type) {
-            case 'SRV':
-              answers.push({
-                type: 'SRV',
-                name: q.name,
-                ttl: ttl,
-                data: {
-                  target: host,
-                  port: port
-                }
-              })
-              break
-
-            case 'A': // mostly for debugging
-              answers.push({
-                type: 'A',
-                name: q.name,
-                ttl: ttl || 30,
-                data: host === '0.0.0.0' ? address() : host
-              })
-              break
-          }
-        }
-      }
-
-      if (query.id || answers.length) socket.respond({id: query.id, answers: answers}, external ? rinfo : null)
+Discovery.prototype._onquestion = function (query, port, host, answers, multicast) {
+  if (query.type === 'TXT' && query.name === this._domain) {
+    answers.push({
+      type: 'TXT',
+      name: query.name,
+      ttl: this._ttl,
+      data: txt.encode({
+        token: hash(this._secrets[1], host),
+        host: host,
+        port: '' + port
+      })
     })
+    return
+  }
 
-    socket.on('response', function (response, rinfo) {
-      var i = 0
+  var id = this._getId(query.name)
+  if (!id) return
 
-      for (i = 0; i < response.answers.length; i++) answer(response.answers[i], rinfo)
-      for (i = 0; i < response.additionals.length; i++) answer(response.additionals[i], rinfo)
+  if (query.type === 'TXT') {
+    var buf = toBuffer(this._domainStore.get(id, 100))
+    if (multicast && !buf.length) return // just an optimization
+    answers.push({
+      type: 'TXT',
+      name: query.name,
+      ttl: this._ttl,
+      data: txt.encode({
+        token: hash(this._secrets[1], host),
+        peers: buf.toString('base64')
+      })
     })
+    return
+  }
 
-    function answer (a, rinfo) {
-      if (a.type !== 'SRV') return
-      if (a.name.slice(-suffix.length) !== suffix) return
+  var peers = this._domainStore.get(id, 10)
 
-      discover.emit('peer', a.name.slice(0, -suffix.length), {
-        local: !external,
-        host: a.data.target === '0.0.0.0' ? rinfo.address : a.data.target,
-        port: a.data.port || rinfo.port
+  for (var i = 0; i < peers.length; i++) {
+    var peer = peers[i]
+
+    if (query.type === 'A') {
+      answers.push({
+        type: 'A',
+        name: query.name,
+        ttl: this._ttl,
+        data: peer.host === '0.0.0.0' ? network() : peer.host
+      })
+    }
+    if (query.type === 'SRV') {
+      answers.push({
+        type: 'SRV',
+        name: query.name,
+        ttl: this._ttl,
+        data: {
+          port: peer.port,
+          target: peer.host
+        }
       })
     }
   }
 }
 
-function parse (hosts) {
-  if (!Array.isArray(hosts)) hosts = [hosts]
+Discovery.prototype._getId = function (name) {
+  var suffix = '.' + this._domain
+  if (name.slice(-suffix.length) !== suffix) return null
+  return name.slice(0, -suffix.length)
+}
 
-  return hosts.map(function (host) {
-    return {
-      port: Number(host.split(':')[1] || 53),
-      address: host.split(':')[0]
-    }
+Discovery.prototype._onquery = function (query, port, host) {
+  var reply = {questions: query.questions, answers: []}
+  var i = 0
+
+  for (i = 0; i < query.questions.length; i++) {
+    this._onquestion(query.questions[i], port, host, reply.answers)
+  }
+  for (i = 0; i < query.answers.length; i++) {
+    this._onanswer(query.answers[i], port, host)
+  }
+  for (i = 0; i < query.additionals.length; i++) {
+    this._onanswer(query.additionals[i], port, host)
+  }
+
+  this.socket.response(query, reply, port, host)
+}
+
+Discovery.prototype._probeAndAnnounce = function (i, id, port, cb) {
+  var self = this
+  this._probe(i, 0, function (err) {
+    if (err) return cb(err)
+    self._announce(i, id, port, cb)
   })
+}
+
+Discovery.prototype._announce = function (i, id, port, cb) {
+  var s = this.servers[i]
+  var token = this._tokens[i]
+  var data = port === -1 ? {
+    subscribe: true,
+    token: token
+  } : {
+    subscribe: true,
+    token: token,
+    announce: '' + (port || 0)
+  }
+
+  var query = {
+    index: i,
+    questions: [{
+      type: 'TXT',
+      name: id + '.' + this._domain
+    }],
+    additionals: [{
+      type: 'TXT',
+      name: id + '.' + this._domain,
+      ttl: this._ttl,
+      data: txt.encode(data)
+    }]
+  }
+
+  this.socket.query(query, s.port, s.host, cb)
+}
+
+Discovery.prototype.lookup = function (id, cb) {
+  if (!cb) cb = noop
+  if (Buffer.isBuffer(id)) id = id.toString('hex')
+  this.announce(id, -1, cb)
+}
+
+Discovery.prototype.announce = function (id, port, cb) {
+  if (!cb) cb = noop
+  if (Buffer.isBuffer(id)) id = id.toString('hex')
+
+  var self = this
+  var missing = this.servers.length
+  var success = false
+
+  for (var i = 0; i < this.servers.length; i++) {
+    if (this._tokens[i]) this._announce(i, id, port, done)
+    else this._probeAndAnnounce(i, id, port, done)
+  }
+
+  if (port > -1) this._domainStore.add(id, port, '0.0.0.0')
+
+  if (this.multicast) {
+    missing++
+    this.multicast.query({
+      questions: [{
+        type: 'TXT',
+        name: id + '.' + this._domain
+      }]
+    }, done)
+  }
+
+  if (!missing) {
+    missing++
+    process.nextTick(done)
+  }
+
+  function done (_, res, q, port, host) {
+    if (res) {
+      success = true
+      try {
+        var data = res.answers.length && txt.decode(res.answers[0].data)
+      } catch (err) {
+        // do nothing
+      }
+      if (data) self._parseData(id, data, q.index, host)
+    }
+
+    if (!--missing) cb(success ? null : new Error('Query failed'))
+  }
+}
+
+Discovery.prototype._parsePeers = function (id, data, host) {
+  try {
+    var buf = Buffer(data.peers, 'base64')
+  } catch (err) {
+    return
+  }
+
+  for (var i = 0; i < buf.length; i += 6) {
+    var peer = decodePeer(buf, i)
+    if (!peer) continue
+    if (peer.host === '0.0.0.0') peer.host = host
+    this.emit('peer', id, peer)
+  }
+}
+
+Discovery.prototype._parseData = function (id, data, index, host) {
+  if (data.token) {
+    this._tokens[index] = data.token
+    this._tokensAge[index] = this._tick
+  }
+  if (data && data.peers && id) this._parsePeers(id, data, host)
+}
+
+Discovery.prototype.probe = function (cb) {
+  var missing = this.servers.length
+  var prevData = null
+  var prevHost = null
+  var called = false
+
+  for (var i = 0; i < this.servers.length; i++) this._probe(i, 2, done)
+
+  if (!missing) {
+    missing++
+    process.nextTick(done)
+  }
+
+  function done (_, data, port, host) {
+    if (data) {
+      if (!called && IPv4.test(data.host) && PORT.test(data.port)) {
+        if (prevHost && prevHost !== host) {
+          called = true
+          if (prevData.host === data.host && prevData.port === data.port) {
+            cb(null, {port: Number(data.port), host: data.host})
+          } else {
+            cb(new Error('Inconsistent remote port/host'))
+          }
+        }
+        prevData = data
+        prevHost = host
+      }
+    }
+
+    if (--missing || called) return
+    cb(new Error('Probe failed'))
+  }
+}
+
+Discovery.prototype._probe = function (i, retries, cb) {
+  var self = this
+  var s = this.servers[i]
+  var query = {
+    questions: [{
+      type: 'TXT',
+      name: this._domain
+    }]
+  }
+
+  var missing = 1
+  var id1 = this.socket.query(query, s.port, s.host, done)
+  var id2 = 0
+  var result = null
+
+  if (s.secondaryPort) {
+    missing++
+    id2 = this.socket.query(query, s.secondaryPort, s.host, done)
+  }
+
+  if (retries) {
+    this.socket.setRetries(id1, retries)
+    if (id2) this.socket.setRetries(id2, retries)
+  }
+
+  function done (_, res, query, port, host) {
+    if (res) {
+      try {
+        var data = res.answers.length && txt.decode(res.answers[0].data)
+      } catch (err) {
+        // do nothing
+      }
+      if (data && data.token) {
+        self._parseData(null, data, i, host)
+        self.socket.cancel(id1)
+        self.socket.cancel(id2)
+        if (id2 && res.id === id2) {
+          s.port = s.secondaryPort
+          s.secondaryPort = 0
+        } else {
+          s.secondaryPort = 0
+        }
+        result = data
+      }
+    }
+
+    if (!--missing) cb(result ? null : new Error('Probe failed'), result, port, host)
+  }
+}
+
+Discovery.prototype.destroy = function (onclose) {
+  if (onclose) this.once('close', onclose)
+
+  var self = this
+  var missing = this._sockets.length
+  clearInterval(this._interval)
+
+  if (this.multicast) this.multicast.destroy(onmulticastclose)
+  else onmulticastclose()
+
+  function onmulticastclose () {
+    for (var i = 0; i < self._sockets.length; i++) {
+      self._sockets[i].destroy(onsocketclose)
+    }
+  }
+
+  function onsocketclose () {
+    if (!--missing) self.emit('close')
+  }
+}
+
+Discovery.prototype.listen = function (ports, onlistening) {
+  if (onlistening) this.once('listening', onlistening)
+  if (this._listening) throw new Error('Server is already listening')
+  this._listening = true
+
+  if (!ports) ports = [53, 5300]
+  if (!Array.isArray(ports)) ports = [ports]
+
+  var self = this
+  var missing = ports.length
+
+  for (var i = 0; i < ports.length; i++) {
+    var socket = dns()
+    socket.bind(ports[i], onbind)
+    this._onsocket(socket)
+  }
+
+  function onbind () {
+    if (!--missing) self.emit('listening')
+  }
+}
+
+function noop () {}
+
+function parseAddr (addr) {
+  if (addr.indexOf(':') === -1) addr += ':53,5300'
+  var match = addr.match(/^([^:]+)(?::(\d{1,5})(?:,(\d{1,5}))?)?$/)
+  if (!match) throw new Error('Could not parse ' + addr)
+
+  return {
+    port: Number(match[2] || 53),
+    secondaryPort: Number(match[3] || 0),
+    host: match[1]
+  }
+}
+
+function hash (secret, host) {
+  return crypto.createHash('sha256').update(secret).update(host).digest('base64')
+}
+
+function toBuffer (peers) {
+  var buf = Buffer(peers.length * 6)
+  for (var i = 0; i < peers.length; i++) {
+    if (!peers[i].buffer) peers[i].buffer = encodePeer(peers[i])
+    peers[i].buffer.copy(buf, i * 6)
+  }
+  return buf
+}
+
+function encodePeer (peer) {
+  var buf = Buffer(6)
+  var parts = peer.host.split('.')
+  buf[0] = Number(parts[0] || 0)
+  buf[1] = Number(parts[1] || 0)
+  buf[2] = Number(parts[2] || 0)
+  buf[3] = Number(parts[3] || 0)
+  buf.writeUInt16BE(peer.port || 0, 4)
+  return buf
+}
+
+function decodePeer (buf, offset) {
+  if (buf.length - offset < 6) return null
+  var host = buf[offset++] + '.' + buf[offset++] + '.' + buf[offset++] + '.' + buf[offset++]
+  var port = buf.readUInt16BE(offset)
+  offset += 2
+  return {port: port, host: host}
 }
