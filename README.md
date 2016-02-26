@@ -37,7 +37,6 @@ Create a new discovery instance. Options include:
   limit: someLimit, // max number of records stored. defaults to 10000.
   multicast: true, // use multicast-dns. defaults to true.
   domain: 'my-domain.com', // top-level domain to use for records. defaults to dns-discovery.local
-  impliedPort: false, // use the port of the dns socket as the announced port when talking to servers
   socket: someUdpSocket // use this udp socket as the client socket
 }
 ```
@@ -64,13 +63,18 @@ disc.on('peer', function (name, peer) {
 })
 ```
 
-#### `disc.announce(name, port, [callback])`
+#### `disc.announce(name, port, [options], [callback])`
 
 Announce a new port for a specific app name. Announce also does a lookup so you don't need to do that afterwards.
 
-#### `disc.unannounce(name, port, [callback])`
+If you want to specify a public port (a port that is reachable from outside your firewall) you can set the `publicPort: port`
+option. This will announce the public port to your list of dns servers and use the other port over multicast.
 
-Stop announcing a port for an app.
+You can also set `impliedPort: true` to announce the public port of the dns socket to the list of dns servers.
+
+#### `disc.unannounce(name, port, [options], [callback])`
+
+Stop announcing a port for an app. Has the same options as .announce
 
 #### `disc.listen([port], [callback])`
 

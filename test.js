@@ -202,7 +202,7 @@ freePort(function (port) {
 
     var server = discovery({multicast: false})
     var client2 = discovery({multicast: false, server: 'localhost:' + port})
-    var client1 = discovery({multicast: false, server: 'localhost:' + port, impliedPort: true, socket: socket})
+    var client1 = discovery({multicast: false, server: 'localhost:' + port, socket: socket})
 
     server.on('peer', function (name, peer) {
       t.same(name, 'hello-world')
@@ -218,8 +218,38 @@ freePort(function (port) {
     })
 
     server.listen(port, function () {
-      client1.announce('hello-world', 8080, function () {
+      client1.announce('hello-world', 8080, {impliedPort: true}, function () {
         client2.lookup('hello-world')
+      })
+    })
+  })
+
+  tape('public port', function (t) {
+    var server = discovery({multicast: false})
+    var client2 = discovery({server: 'localhost:' + port})
+    var client1 = discovery({server: 'localhost:' + port})
+    var ns = Math.random().toString(16) + '-' + process.pid
+    var appName = 'dns-discovery-' + ns
+    var missing = 2
+
+    server.on('peer', function (name, peer) {
+      t.same(name, appName)
+      t.same(peer.port, 9090, 'server port')
+    })
+
+    client2.on('peer', function (name, peer) {
+      t.same(name, appName)
+      t.same(peer.port, peer.host === '127.0.0.1' ? 9090 : 8080)
+      if (--missing) return
+      server.destroy()
+      client1.destroy()
+      client2.destroy()
+      t.end()
+    })
+
+    server.listen(port, function () {
+      client1.announce(appName, 8080, {publicPort: 9090}, function () {
+        client2.lookup(appName)
       })
     })
   })

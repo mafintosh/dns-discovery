@@ -23,7 +23,6 @@ function DNSDiscovery (opts) {
   this.socket = dns(opts)
   this.servers = [].concat(opts.servers || opts.server || []).map(parseAddr)
 
-  this._impliedPort = !!opts.impliedPort
   this._sockets = []
   this._onsocket(this.socket)
 
@@ -318,8 +317,6 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
   var token = this._tokens[i]
   var data = null
 
-  if (this._impliedPort) port = 0
-
   switch (type) {
     case 1:
       data = {subscribe: true, token: token}
@@ -352,29 +349,32 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
 }
 
 DNSDiscovery.prototype.lookup = function (id, cb) {
-  this._visit(1, id, 0, cb)
+  this._visit(1, id, 0, null, cb)
 }
 
-DNSDiscovery.prototype.announce = function (id, port, cb) {
-  this._visit(2, id, port, cb)
+DNSDiscovery.prototype.announce = function (id, port, opts, cb) {
+  this._visit(2, id, port, opts, cb)
 }
 
-DNSDiscovery.prototype.unannounce = function (id, port, cb) {
-  this._visit(3, id, port, cb)
+DNSDiscovery.prototype.unannounce = function (id, port, opts, cb) {
+  this._visit(3, id, port, opts, cb)
 }
 
-DNSDiscovery.prototype._visit = function (type, id, port, cb) {
+DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
+  if (typeof opts === 'function') return this._visit(type, id, port, null, opts)
   if (typeof port === 'function') return this._visit(type, id, 0, port)
   if (!cb) cb = noop
   if (Buffer.isBuffer(id)) id = id.toString('hex')
+  if (!opts) opts = {}
 
   var self = this
+  var publicPort = opts.publicPort || (opts.impliedPort ? 0 : port)
   var missing = this.servers.length
   var success = false
 
   for (var i = 0; i < this.servers.length; i++) {
-    if (this._tokens[i]) this._send(type, i, id, port, done)
-    else this._probeAndSend(type, i, id, port, done)
+    if (this._tokens[i]) this._send(type, i, id, publicPort, done)
+    else this._probeAndSend(type, i, id, publicPort, done)
   }
 
   if (type === 2) this._domainStore.add(id, port, '0.0.0.0')
