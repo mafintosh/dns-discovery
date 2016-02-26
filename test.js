@@ -136,6 +136,31 @@ freePort(function (port) {
       })
     })
   })
+
+  tape('unannounce', function (t) {
+    var server = discovery({multicast: false})
+    var client1 = discovery({multicast: false, server: 'localhost:' + port})
+    var client2 = discovery({multicast: false, server: 'localhost:' + port})
+
+    client2.on('peer', function () {
+      t.fail('no peers should be discovered')
+    })
+
+    server.listen(port, function () {
+      client1.announce('test', 8080, function () {
+        client1.unannounce('test', 8080, function () {
+          client2.lookup('test', function () {
+            setTimeout(function () {
+              client2.destroy()
+              client1.destroy()
+              server.destroy()
+              t.end()
+            }, 100)
+          })
+        })
+      })
+    })
+  })
 })
 
 function freePort (cb) {

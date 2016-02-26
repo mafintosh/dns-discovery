@@ -186,8 +186,15 @@ Discovery.prototype._onanswer = function (answer, port, host) {
       this._push(id, announce, host)
     }
 
+    if (PORT.test(data.unannounce)) {
+      var unannounce = Number(data.unannounce) || port
+      this._domainStore.remove(id, unannounce, host)
+    }
+
     if (data.subscribe) {
       this._pushStore.add(id, port, host)
+    } else {
+      this._pushStore.remove(id, port, host)
     }
   }
 }
@@ -296,24 +303,31 @@ Discovery.prototype._onquery = function (query, port, host) {
   this.socket.response(query, reply, port, host)
 }
 
-Discovery.prototype._probeAndAnnounce = function (i, id, port, cb) {
+Discovery.prototype._probeAndSend = function (type, i, id, port, cb) {
   var self = this
   this._probe(i, 0, function (err) {
     if (err) return cb(err)
-    self._announce(i, id, port, cb)
+    self._send(type, i, id, port, cb)
   })
 }
 
-Discovery.prototype._announce = function (i, id, port, cb) {
+Discovery.prototype._send = function (type, i, id, port, cb) {
   var s = this.servers[i]
   var token = this._tokens[i]
-  var data = port === -1 ? {
-    subscribe: true,
-    token: token
-  } : {
-    subscribe: true,
-    token: token,
-    announce: '' + (port || 0)
+  var data = null
+
+  switch (type) {
+    case 1:
+      data = {subscribe: true, token: token}
+      break
+
+    case 2:
+      data = {subscribe: true, token: token, announce: '' + (port || 0)}
+      break
+
+    case 3:
+      data = {token: token, unannounce: '' + (port || 0)}
+      break
   }
 
   var query = {
@@ -334,12 +348,19 @@ Discovery.prototype._announce = function (i, id, port, cb) {
 }
 
 Discovery.prototype.lookup = function (id, cb) {
-  if (!cb) cb = noop
-  if (Buffer.isBuffer(id)) id = id.toString('hex')
-  this.announce(id, -1, cb)
+  this._visit(1, id, 0, cb)
 }
 
 Discovery.prototype.announce = function (id, port, cb) {
+  this._visit(2, id, port, cb)
+}
+
+Discovery.prototype.unannounce = function (id, port, cb) {
+  this._visit(3, id, port, cb)
+}
+
+Discovery.prototype._visit = function (type, id, port, cb) {
+  if (typeof port === 'function') return this._visit(type, id, 0, port)
   if (!cb) cb = noop
   if (Buffer.isBuffer(id)) id = id.toString('hex')
 
@@ -348,13 +369,14 @@ Discovery.prototype.announce = function (id, port, cb) {
   var success = false
 
   for (var i = 0; i < this.servers.length; i++) {
-    if (this._tokens[i]) this._announce(i, id, port, done)
-    else this._probeAndAnnounce(i, id, port, done)
+    if (this._tokens[i]) this._send(type, i, id, port, done)
+    else this._probeAndSend(type, i, id, port, done)
   }
 
-  if (port > -1) this._domainStore.add(id, port, '0.0.0.0')
+  if (type === 2) this._domainStore.add(id, port, '0.0.0.0')
+  if (type === 3) this._domainStore.remove(id, port, '0.0.0.0')
 
-  if (this.multicast) {
+  if (this.multicast && type !== 3) {
     missing++
     this.multicast.query({
       questions: [{
