@@ -224,6 +224,17 @@ freePort(function (port) {
     })
   })
 
+  tape('loopback', function (t) {
+    var client = discovery({loopback: true})
+
+    client.on('peer', function () {
+      client.destroy()
+      t.end()
+    })
+
+    client.announce('test', 8080)
+  })
+
   tape('public port', function (t) {
     var server = discovery({multicast: false})
     var client2 = discovery({server: 'localhost:' + port})

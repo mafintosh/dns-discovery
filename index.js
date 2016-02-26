@@ -33,6 +33,7 @@ function DNSDiscovery (opts) {
     this.multicast.on('error', onerror)
   }
 
+  this._loopback = !!opts.loopback
   this._listening = false
   this._id = crypto.randomBytes(32).toString('base64')
   this._domain = opts.domain || 'dns-discovery.local'
@@ -168,7 +169,7 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host) {
 
     var tokenMatch = data.token === hash(this._secrets[1], host)
 
-    if (!tokenMatch) {
+    if (!tokenMatch || this._loopback) {
       // not an echo
       this._parsePeers(id, data, host)
     }

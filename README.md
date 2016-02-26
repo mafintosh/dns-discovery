@@ -37,7 +37,8 @@ Create a new discovery instance. Options include:
   limit: someLimit, // max number of records stored. defaults to 10000.
   multicast: true, // use multicast-dns. defaults to true.
   domain: 'my-domain.com', // top-level domain to use for records. defaults to dns-discovery.local
-  socket: someUdpSocket // use this udp socket as the client socket
+  socket: someUdpSocket, // use this udp socket as the client socket
+  loopback: false // discover yourself over multicast
 }
 ```
 
