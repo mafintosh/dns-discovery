@@ -1,10 +1,10 @@
 var discovery = require('dns-discovery')
 
-var disc = discovery()
+var disc1 = discovery()
+var disc2 = discovery()
 
-disc.on('peer', function (name, peer) {
+disc2.on('peer', function (name, peer) {
   console.log(name, peer)
 })
 
-disc.announce('test', 4244)
-disc.lookup('test')
+disc1.announce('test', 4244)

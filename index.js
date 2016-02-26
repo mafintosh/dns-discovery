@@ -145,7 +145,8 @@ DNSDiscovery.prototype._onmulticastresponse = function (response, port, host) {
 }
 
 DNSDiscovery.prototype._onanswer = function (answer, port, host) {
-  var id = this._getId(answer.name)
+  var domain = parseDomain(answer.name)
+  var id = parseId(answer.name, domain)
   if (!id) return
 
   if (answer.type === 'SRV') {
@@ -222,7 +223,9 @@ DNSDiscovery.prototype._push = function (id, port, host) {
 }
 
 DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multicast) {
-  if (query.type === 'TXT' && query.name === this._domain) {
+  var domain = parseDomain(query.name)
+
+  if (query.type === 'TXT' && domain === query.name) {
     answers.push({
       type: 'TXT',
       name: query.name,
@@ -236,7 +239,7 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
     return
   }
 
-  var id = this._getId(query.name)
+  var id = parseId(query.name, domain)
   if (!id) return
 
   if (query.type === 'TXT') {
@@ -282,12 +285,6 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
       })
     }
   }
-}
-
-DNSDiscovery.prototype._getId = function (name) {
-  var suffix = '.' + this._domain
-  if (name.slice(-suffix.length) !== suffix) return null
-  return name.slice(0, -suffix.length)
 }
 
 DNSDiscovery.prototype._onquery = function (query, port, host, socket) {
@@ -375,15 +372,17 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
   var missing = this.servers.length
   var success = false
 
-  for (var i = 0; i < this.servers.length; i++) {
-    if (this._tokens[i]) this._send(type, i, id, publicPort, done)
-    else this._probeAndSend(type, i, id, publicPort, done)
+  if (opts.publicPort !== false) {
+    for (var i = 0; i < this.servers.length; i++) {
+      if (this._tokens[i]) this._send(type, i, id, publicPort, done)
+      else this._probeAndSend(type, i, id, publicPort, done)
+    }
   }
 
   if (type === 2) this._domainStore.add(id, port, '0.0.0.0')
   if (type === 3) this._domainStore.remove(id, port, '0.0.0.0')
 
-  if (this.multicast && type !== 3) {
+  if (opts.multicast !== false && this.multicast && type !== 3) {
     missing++
     this.multicast.query({
       questions: [{
@@ -579,6 +578,18 @@ function parseAddr (addr) {
 
 function hash (secret, host) {
   return crypto.createHash('sha256').update(secret).update(host).digest('base64')
+}
+
+function parseId (name, domain) {
+  if (!domain || name.length === domain.length) return null
+  return name.slice(0, -domain.length - 1)
+}
+
+function parseDomain (name) {
+  var i = name.lastIndexOf('.')
+  if (i === -1) return null
+  i = name.lastIndexOf('.', i - 1)
+  return i === -1 ? name : name.slice(i + 1)
 }
 
 function toBuffer (peers) {
