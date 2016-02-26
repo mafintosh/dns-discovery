@@ -10,10 +10,10 @@ var store = require('./store')
 var IPv4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}.\d{1,3}$/
 var PORT = /^\d{1,5}$/
 
-module.exports = Discovery
+module.exports = DNSDiscovery
 
-function Discovery (opts) {
-  if (!(this instanceof Discovery)) return new Discovery(opts)
+function DNSDiscovery (opts) {
+  if (!(this instanceof DNSDiscovery)) return new DNSDiscovery(opts)
   if (!opts) opts = {}
 
   events.EventEmitter.call(this)
@@ -23,6 +23,7 @@ function Discovery (opts) {
   this.socket = dns(opts)
   this.servers = [].concat(opts.servers || opts.server || []).map(parseAddr)
 
+  this._impliedPort = !!opts.impliedPort
   this._sockets = []
   this._onsocket(this.socket)
 
@@ -76,13 +77,13 @@ function Discovery (opts) {
   }
 }
 
-util.inherits(Discovery, events.EventEmitter)
+util.inherits(DNSDiscovery, events.EventEmitter)
 
-Discovery.prototype.toJSON = function () {
+DNSDiscovery.prototype.toJSON = function () {
   return this._domainStore.toJSON()
 }
 
-Discovery.prototype._onsocket = function (socket) {
+DNSDiscovery.prototype._onsocket = function (socket) {
   var self = this
 
   this._sockets.push(socket)
@@ -98,7 +99,7 @@ Discovery.prototype._onsocket = function (socket) {
   }
 }
 
-Discovery.prototype._rotateSecrets = function () {
+DNSDiscovery.prototype._rotateSecrets = function () {
   if (this._listening) {
     this._secrets.shift()
     this._secrets.push(crypto.randomBytes(32))
@@ -114,7 +115,7 @@ Discovery.prototype._rotateSecrets = function () {
   this._tick++
 }
 
-Discovery.prototype._onmulticastquery = function (query, port, host) {
+DNSDiscovery.prototype._onmulticastquery = function (query, port, host) {
   var reply = {questions: query.questions, answers: []}
   var i = 0
 
@@ -133,7 +134,7 @@ Discovery.prototype._onmulticastquery = function (query, port, host) {
   }
 }
 
-Discovery.prototype._onmulticastresponse = function (response, port, host) {
+DNSDiscovery.prototype._onmulticastresponse = function (response, port, host) {
   var i = 0
 
   for (i = 0; i < response.answers.length; i++) {
@@ -144,7 +145,7 @@ Discovery.prototype._onmulticastresponse = function (response, port, host) {
   }
 }
 
-Discovery.prototype._onanswer = function (answer, port, host) {
+DNSDiscovery.prototype._onanswer = function (answer, port, host) {
   var id = this._getId(answer.name)
   if (!id) return
 
@@ -200,7 +201,7 @@ Discovery.prototype._onanswer = function (answer, port, host) {
   }
 }
 
-Discovery.prototype._push = function (id, port, host) {
+DNSDiscovery.prototype._push = function (id, port, host) {
   var subs = this._pushStore.get(id, 16)
   var query = {
     additionals: [{
@@ -221,7 +222,7 @@ Discovery.prototype._push = function (id, port, host) {
   }
 }
 
-Discovery.prototype._onquestion = function (query, port, host, answers, multicast) {
+DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multicast) {
   if (query.type === 'TXT' && query.name === this._domain) {
     answers.push({
       type: 'TXT',
@@ -281,13 +282,13 @@ Discovery.prototype._onquestion = function (query, port, host, answers, multicas
   }
 }
 
-Discovery.prototype._getId = function (name) {
+DNSDiscovery.prototype._getId = function (name) {
   var suffix = '.' + this._domain
   if (name.slice(-suffix.length) !== suffix) return null
   return name.slice(0, -suffix.length)
 }
 
-Discovery.prototype._onquery = function (query, port, host) {
+DNSDiscovery.prototype._onquery = function (query, port, host) {
   var reply = {questions: query.questions, answers: []}
   var i = 0
 
@@ -304,7 +305,7 @@ Discovery.prototype._onquery = function (query, port, host) {
   this.socket.response(query, reply, port, host)
 }
 
-Discovery.prototype._probeAndSend = function (type, i, id, port, cb) {
+DNSDiscovery.prototype._probeAndSend = function (type, i, id, port, cb) {
   var self = this
   this._probe(i, 0, function (err) {
     if (err) return cb(err)
@@ -312,10 +313,12 @@ Discovery.prototype._probeAndSend = function (type, i, id, port, cb) {
   })
 }
 
-Discovery.prototype._send = function (type, i, id, port, cb) {
+DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
   var s = this.servers[i]
   var token = this._tokens[i]
   var data = null
+
+  if (this._impliedPort) port = 0
 
   switch (type) {
     case 1:
@@ -323,11 +326,11 @@ Discovery.prototype._send = function (type, i, id, port, cb) {
       break
 
     case 2:
-      data = {subscribe: true, token: token, announce: '' + (port || 0)}
+      data = {subscribe: true, token: token, announce: '' + port}
       break
 
     case 3:
-      data = {token: token, unannounce: '' + (port || 0)}
+      data = {token: token, unannounce: '' + port}
       break
   }
 
@@ -348,19 +351,19 @@ Discovery.prototype._send = function (type, i, id, port, cb) {
   this.socket.query(query, s.port, s.host, cb)
 }
 
-Discovery.prototype.lookup = function (id, cb) {
+DNSDiscovery.prototype.lookup = function (id, cb) {
   this._visit(1, id, 0, cb)
 }
 
-Discovery.prototype.announce = function (id, port, cb) {
+DNSDiscovery.prototype.announce = function (id, port, cb) {
   this._visit(2, id, port, cb)
 }
 
-Discovery.prototype.unannounce = function (id, port, cb) {
+DNSDiscovery.prototype.unannounce = function (id, port, cb) {
   this._visit(3, id, port, cb)
 }
 
-Discovery.prototype._visit = function (type, id, port, cb) {
+DNSDiscovery.prototype._visit = function (type, id, port, cb) {
   if (typeof port === 'function') return this._visit(type, id, 0, port)
   if (!cb) cb = noop
   if (Buffer.isBuffer(id)) id = id.toString('hex')
@@ -407,7 +410,7 @@ Discovery.prototype._visit = function (type, id, port, cb) {
   }
 }
 
-Discovery.prototype._parsePeers = function (id, data, host) {
+DNSDiscovery.prototype._parsePeers = function (id, data, host) {
   try {
     var buf = Buffer(data.peers, 'base64')
   } catch (err) {
@@ -422,7 +425,7 @@ Discovery.prototype._parsePeers = function (id, data, host) {
   }
 }
 
-Discovery.prototype._parseData = function (id, data, index, host) {
+DNSDiscovery.prototype._parseData = function (id, data, index, host) {
   if (data.token) {
     this._tokens[index] = data.token
     this._tokensAge[index] = this._tick
@@ -430,16 +433,16 @@ Discovery.prototype._parseData = function (id, data, index, host) {
   if (data && data.peers && id) this._parsePeers(id, data, host)
 }
 
-Discovery.prototype.probe = function (cb) {
+DNSDiscovery.prototype.whoami = function (cb) {
   var missing = this.servers.length
   var prevData = null
   var prevHost = null
   var called = false
 
-  for (var i = 0; i < this.servers.length; i++) this._probe(i, 2, done)
-
-  if (!missing) {
-    missing++
+  if (this.servers.length > 1) {
+    for (var i = 0; i < this.servers.length; i++) this._probe(i, 2, done)
+  } else {
+    missing = 1
     process.nextTick(done)
   }
 
@@ -464,7 +467,7 @@ Discovery.prototype.probe = function (cb) {
   }
 }
 
-Discovery.prototype._probe = function (i, retries, cb) {
+DNSDiscovery.prototype._probe = function (i, retries, cb) {
   var self = this
   var s = this.servers[i]
   var query = {
@@ -514,7 +517,7 @@ Discovery.prototype._probe = function (i, retries, cb) {
   }
 }
 
-Discovery.prototype.destroy = function (onclose) {
+DNSDiscovery.prototype.destroy = function (onclose) {
   if (onclose) this.once('close', onclose)
 
   var self = this
@@ -535,7 +538,7 @@ Discovery.prototype.destroy = function (onclose) {
   }
 }
 
-Discovery.prototype.listen = function (ports, onlistening) {
+DNSDiscovery.prototype.listen = function (ports, onlistening) {
   if (onlistening) this.once('listening', onlistening)
   if (this._listening) throw new Error('Server is already listening')
   this._listening = true

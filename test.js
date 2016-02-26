@@ -194,6 +194,35 @@ freePort(function (port) {
       })
     })
   })
+
+  tape('implied port', function (t) {
+    t.plan(4)
+
+    var socket = dgram.createSocket('udp4')
+
+    var server = discovery({multicast: false})
+    var client2 = discovery({multicast: false, server: 'localhost:' + port})
+    var client1 = discovery({multicast: false, server: 'localhost:' + port, impliedPort: true, socket: socket})
+
+    server.on('peer', function (name, peer) {
+      t.same(name, 'hello-world')
+      t.same(peer.port, socket.address().port)
+    })
+
+    client2.on('peer', function (name, peer) {
+      t.same(name, 'hello-world')
+      t.same(peer.port, socket.address().port)
+      server.destroy()
+      client1.destroy()
+      client2.destroy()
+    })
+
+    server.listen(port, function () {
+      client1.announce('hello-world', 8080, function () {
+        client2.lookup('hello-world')
+      })
+    })
+  })
 })
 
 function freePort (cb) {
