@@ -161,6 +161,39 @@ freePort(function (port) {
       })
     })
   })
+
+  tape('custom socket + server', function (t) {
+    t.plan(5)
+
+    var socket = dgram.createSocket('udp4')
+
+    socket.once('message', function () {
+      t.pass('used custom socket')
+    })
+
+    var server = discovery({multicast: false})
+    var client2 = discovery({multicast: false, server: 'localhost:' + port, socket: socket})
+    var client1 = discovery({multicast: false, server: 'localhost:' + port})
+
+    server.on('peer', function (name, peer) {
+      t.same(name, 'hello-world')
+      t.same(peer.port, 8080)
+    })
+
+    client2.on('peer', function (name, peer) {
+      t.same(name, 'hello-world')
+      t.same(peer.port, 8080)
+      server.destroy()
+      client1.destroy()
+      client2.destroy()
+    })
+
+    server.listen(port, function () {
+      client1.announce('hello-world', 8080, function () {
+        client2.lookup('hello-world')
+      })
+    })
+  })
 })
 
 function freePort (cb) {
