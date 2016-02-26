@@ -182,8 +182,9 @@ Discovery.prototype._onanswer = function (answer, port, host) {
     if (PORT.test(data.announce)) {
       var announce = Number(data.announce) || port
       this.emit('peer', id, {port: announce, host: host})
-      this._domainStore.add(id, announce, host)
-      this._push(id, announce, host)
+      if (this._domainStore.add(id, announce, host)) {
+        this._push(id, announce, host)
+      }
     }
 
     if (PORT.test(data.unannounce)) {

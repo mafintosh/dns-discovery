@@ -72,7 +72,8 @@ Store.prototype.add = function (name, port, host) {
   }
 
   var prev = entry.byAddr.get(peer.address)
-  if (!prev) {
+  var old = !!prev
+  if (!old) {
     prev = peer
     set.add(entry.values, peer)
     entry.byAddr.set(peer.address, peer)
@@ -80,7 +81,7 @@ Store.prototype.add = function (name, port, host) {
   }
   if (this.ttl) prev._modified = Date.now()
 
-  return peer
+  return !old
 }
 
 Store.prototype.evict = function () {
