@@ -36,7 +36,9 @@ Create a new discovery instance. Options include:
   ttl: someSeconds, // ttl for records in seconds. defaults to Infinity.
   limit: someLimit, // max number of records stored. defaults to 10000.
   multicast: true, // use multicast-dns. defaults to true.
-  domain: 'my-domain.com' // top-level domain to use for records. defaults to dns-discovery.local
+  domain: 'my-domain.com', // top-level domain to use for records. defaults to dns-discovery.local
+  impliedPort: false, // use the port of the dns socket as the announced port when talking to servers
+  socket: someUdpSocket // use this udp socket as the client socket
 }
 ```
 
