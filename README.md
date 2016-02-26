@@ -13,17 +13,15 @@ npm install dns-discovery
 ``` js
 var discovery = require('dns-discovery')
 
-var disc = discovery()
+var disc1 = discovery()
+var disc2 = discovery()
 
-disc.on('peer', function (name, peer) {
+disc1.on('peer', function (name, peer) {
   console.log(name, peer)
 })
 
 // announce an app
-disc.announce('test-app', 9090)
-
-// find peers for this app
-disc.lookup('test-app')
+disc2.announce('test-app', 9090)
 ```
 
 ## API
@@ -38,7 +36,6 @@ Create a new discovery instance. Options include:
   ttl: someSeconds, // ttl for records in seconds. defaults to Infinity.
   limit: someLimit, // max number of records stored. defaults to 10000.
   multicast: true, // use multicast-dns. defaults to true.
-  push: false, // server will push out records as they arrive. defaults to false
   domain: 'my-domain.com' // top-level domain to use for records. defaults to dns-discovery.local
 }
 ```
@@ -65,22 +62,13 @@ disc.on('peer', function (name, peer) {
 })
 ```
 
-#### `disc.announce(name, peer, [callback])`
+#### `disc.announce(name, port, [callback])`
 
-Announce a new peer for a specific app name. `peer` should be an object looking like this
+Announce a new port for a specific app name. Announce also does a lookup so you don't need to do that afterwards.
 
-``` js
-{
-  host: someHost // defaults to your local network ip
-  port: somePort // you have to specify this
-}
-```
+#### `disc.unannounce(name, port, [callback])`
 
-As a shorthand option you can use `disc.announce(name, port)`
-
-#### `disc.unannounce(name, peer)`
-
-Stop announcing a peer for an app.
+Stop announcing a port for an app.
 
 #### `disc.listen([port], [callback])`
 
@@ -95,7 +83,11 @@ server.listen(9090, function () {
 ```
 
 You can setup a discovery server to announce records on the internet as multicast-dns only works on a local network.
-The port defaults to `53` which is the standard dns port.
+The port defaults to `53` which is the standard dns port. Additionally it tries to bind to `5300` to support networks that filter dns traffic.
+
+#### `disc.destroy([onclose])`
+
+Destroy the discovery instance. Will destroy the underlying udp socket as well.
 
 ## CLI
 
