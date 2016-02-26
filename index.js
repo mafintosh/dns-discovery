@@ -94,7 +94,7 @@ DNSDiscovery.prototype._onsocket = function (socket) {
   }
 
   function onquery (message, port, host) {
-    self._onquery(message, port, host)
+    self._onquery(message, port, host, socket)
   }
 }
 
@@ -287,7 +287,7 @@ DNSDiscovery.prototype._getId = function (name) {
   return name.slice(0, -suffix.length)
 }
 
-DNSDiscovery.prototype._onquery = function (query, port, host) {
+DNSDiscovery.prototype._onquery = function (query, port, host, socket) {
   var reply = {questions: query.questions, answers: []}
   var i = 0
 
@@ -301,7 +301,7 @@ DNSDiscovery.prototype._onquery = function (query, port, host) {
     this._onanswer(query.additionals[i], port, host)
   }
 
-  this.socket.response(query, reply, port, host)
+  socket.response(query, reply, port, host)
 }
 
 DNSDiscovery.prototype._probeAndSend = function (type, i, id, port, cb) {
