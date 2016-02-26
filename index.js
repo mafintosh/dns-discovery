@@ -241,14 +241,17 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
 
   if (query.type === 'TXT') {
     var buf = toBuffer(this._domainStore.get(id, 100))
+    var token = hash(this._secrets[1], host)
     if (multicast && !buf.length) return // just an optimization
     answers.push({
       type: 'TXT',
       name: query.name,
       ttl: this._ttl,
-      data: txt.encode({
-        token: hash(this._secrets[1], host),
+      data: txt.encode(buf.length ? {
+        token: token,
         peers: buf.toString('base64')
+      } : {
+        token: token
       })
     })
     return
