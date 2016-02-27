@@ -349,8 +349,8 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
   this.socket.query(query, s.port, s.host, cb)
 }
 
-DNSDiscovery.prototype.lookup = function (id, cb) {
-  this._visit(1, id, 0, null, cb)
+DNSDiscovery.prototype.lookup = function (id, opts, cb) {
+  this._visit(1, id, 0, opts, cb)
 }
 
 DNSDiscovery.prototype.announce = function (id, port, opts, cb) {
@@ -369,11 +369,11 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
   if (!opts) opts = {}
 
   var self = this
-  var publicPort = opts.publicPort || (opts.impliedPort ? 0 : port)
   var missing = this.servers.length
   var success = false
 
-  if (opts.publicPort !== false) {
+  if (opts.server !== false) {
+    var publicPort = opts.publicPort || (opts.impliedPort ? 0 : port)
     for (var i = 0; i < this.servers.length; i++) {
       if (this._tokens[i]) this._send(type, i, id, publicPort, done)
       else this._probeAndSend(type, i, id, publicPort, done)
@@ -383,14 +383,16 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
   if (type === 2) this._domainStore.add(id, port, '0.0.0.0')
   if (type === 3) this._domainStore.remove(id, port, '0.0.0.0')
 
-  if (opts.multicast !== false && this.multicast && type !== 3) {
-    missing++
-    this.multicast.query({
-      questions: [{
-        type: 'TXT',
-        name: id + '.' + this._domain
-      }]
-    }, done)
+  if (opts.multicast !== false && this.multicast) {
+    if (type !== 3) {
+      missing++
+      this.multicast.query({
+        questions: [{
+          type: 'TXT',
+          name: id + '.' + this._domain
+        }]
+      }, done)
+    }
   }
 
   if (!missing) {
@@ -442,7 +444,7 @@ DNSDiscovery.prototype.whoami = function (cb) {
   var prevHost = null
   var called = false
 
-  if (this.servers.length > 1) {
+  if (this.servers.length) {
     for (var i = 0; i < this.servers.length; i++) this._probe(i, 2, done)
   } else {
     missing = 1
@@ -456,6 +458,8 @@ DNSDiscovery.prototype.whoami = function (cb) {
           called = true
           if (prevData.host === data.host && prevData.port === data.port) {
             cb(null, {port: Number(data.port), host: data.host})
+          } else if (prevData.host === data.host) {
+            cb(null, {port: 0, host: data.host})
           } else {
             cb(new Error('Inconsistent remote port/host'))
           }
@@ -466,7 +470,8 @@ DNSDiscovery.prototype.whoami = function (cb) {
     }
 
     if (--missing || called) return
-    cb(new Error('Probe failed'))
+    if (data) cb(null, {port: 0, host: data.host})
+    else cb(new Error('Probe failed'))
   }
 }
 

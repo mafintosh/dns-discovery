@@ -104,9 +104,10 @@ freePort(function (port) {
 
   tape('limit', function (t) {
     var server = discovery({multicast: false, limit: 1})
+    var ns = Math.random().toString(16) + '-' + process.pid
 
-    server.announce('hello-world', 8080)
-    server.announce('hello-world-2', 8081)
+    server.announce(ns + 'hello-world', 8080)
+    server.announce(ns + 'hello-world-2', 8081)
 
     var domains = server.toJSON()
     t.same(domains.length, 1)
