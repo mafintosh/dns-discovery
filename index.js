@@ -123,10 +123,10 @@ DNSDiscovery.prototype._onmulticastquery = function (query, port, host) {
     this._onquestion(query.questions[i], port, host, reply.answers, true)
   }
   for (i = 0; i < query.answers.length; i++) {
-    this._onanswer(query.answers[i], port, host)
+    this._onanswer(query.answers[i], port, host, null)
   }
   for (i = 0; i < query.additionals.length; i++) {
-    this._onanswer(query.additionals[i], port, host)
+    this._onanswer(query.additionals[i], port, host, null)
   }
 
   if (reply.answers.length) {
@@ -138,14 +138,14 @@ DNSDiscovery.prototype._onmulticastresponse = function (response, port, host) {
   var i = 0
 
   for (i = 0; i < response.answers.length; i++) {
-    this._onanswer(response.answers[i], port, host)
+    this._onanswer(response.answers[i], port, host, null)
   }
   for (i = 0; i < response.additionals.length; i++) {
-    this._onanswer(response.additionals[i], port, host)
+    this._onanswer(response.additionals[i], port, host, null)
   }
 }
 
-DNSDiscovery.prototype._onanswer = function (answer, port, host) {
+DNSDiscovery.prototype._onanswer = function (answer, port, host, socket) {
   var domain = parseDomain(answer.name)
   var id = parseId(answer.name, domain)
   if (!id) return
@@ -184,8 +184,8 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host) {
     if (PORT.test(data.announce)) {
       var announce = Number(data.announce) || port
       this.emit('peer', id, {port: announce, host: host})
-      if (this._domainStore.add(id, announce, host)) {
-        this._push(id, announce, host)
+      if (this._domainStore.add(id, announce, host) && socket) {
+        this._push(id, announce, host, socket)
       }
     }
 
@@ -202,7 +202,7 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host) {
   }
 }
 
-DNSDiscovery.prototype._push = function (id, port, host) {
+DNSDiscovery.prototype._push = function (id, port, host, socket) {
   var subs = this._pushStore.get(id, 16)
   var query = {
     additionals: [{
@@ -218,8 +218,8 @@ DNSDiscovery.prototype._push = function (id, port, host) {
 
   for (var i = 0; i < subs.length; i++) {
     var peer = subs[i]
-    var tid = this.socket.query(query, peer.port, peer.host)
-    this.socket.setRetries(tid, 2)
+    var tid = socket.query(query, peer.port, peer.host)
+    socket.setRetries(tid, 2)
   }
 }
 
@@ -296,10 +296,10 @@ DNSDiscovery.prototype._onquery = function (query, port, host, socket) {
     this._onquestion(query.questions[i], port, host, reply.answers)
   }
   for (i = 0; i < query.answers.length; i++) {
-    this._onanswer(query.answers[i], port, host)
+    this._onanswer(query.answers[i], port, host, socket)
   }
   for (i = 0; i < query.additionals.length; i++) {
-    this._onanswer(query.additionals[i], port, host)
+    this._onanswer(query.additionals[i], port, host, socket)
   }
 
   socket.response(query, reply, port, host)
