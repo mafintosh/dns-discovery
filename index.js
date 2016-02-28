@@ -346,6 +346,7 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
     }]
   }
 
+  if (process.env.DEBUG_DNS) console.log(s)
   this.socket.query(query, s.port, s.host, cb)
 }
 
