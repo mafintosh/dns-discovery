@@ -346,7 +346,6 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
     }]
   }
 
-  if (process.env.DEBUG_DNS) console.log(s)
   this.socket.query(query, s.port, s.host, cb)
 }
 
@@ -512,7 +511,8 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
         self._parseData(null, data, i, host)
         self.socket.cancel(id1)
         self.socket.cancel(id2)
-        if (id2 && res.id === id2) {
+
+        if (id2 && res.id === id2 && s.secondaryPort) {
           s.port = s.secondaryPort
           s.secondaryPort = 0
         } else {
