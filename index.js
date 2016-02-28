@@ -521,7 +521,7 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
       }
     }
 
-    if (!--missing) cb(result ? null : new Error('Probe failed'), result, port, host)
+    if (!--missing) cb(result ? null : new Error('Probe failed'), result, s.port, host)
   }
 }
 
