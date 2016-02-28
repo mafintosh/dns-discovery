@@ -3,30 +3,6 @@ var tape = require('tape')
 var discovery = require('./')
 
 freePort(function (port) {
-  tape('discovery using remote server', function (t) {
-    var ns = Math.random().toString(16) + '-' + process.pid
-    var appName = 'dns-discovery-' + ns
-    var disc1 = discovery({
-      multicast: false,
-      servers: ['discovery1.publicbits.org', 'discovery2.publicbits.org']
-    })
-    var disc2 = discovery({
-      multicast: false,
-      servers: ['discovery1.publicbits.org', 'discovery2.publicbits.org']
-    })
-
-    disc2.once('peer', function (id, peer) {
-      disc2.destroy()
-      disc1.destroy()
-      t.same(peer.port, 9090)
-      t.end()
-    })
-
-    disc1.announce(appName, 9090, function () {
-      disc2.lookup(appName)
-    })
-  })
-
   tape('discovers', function (t) {
     var disc1 = discovery()
     var disc2 = discovery()
