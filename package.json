@@ -6,7 +6,7 @@
   "dependencies": {
     "dns-socket": "^1.4.1",
     "lru": "^2.0.0",
-    "mdns-txt": "^2.0.0",
+    "dns-txt": "^2.0.1",
     "minimist": "^1.2.0",
     "multicast-dns": "^6.0.0",
     "network-address": "^1.1.0",
