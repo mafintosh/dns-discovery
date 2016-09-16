@@ -4,7 +4,7 @@
   "description": "Discovery peers in a distributed system using regular dns and multicast dns.",
   "main": "index.js",
   "dependencies": {
-    "dns-socket": "^1.4.1",
+    "dns-socket": "^1.4.2",
     "lru": "^2.0.0",
     "dns-txt": "^2.0.1",
     "minimist": "^1.2.0",
