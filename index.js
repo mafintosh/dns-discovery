@@ -485,19 +485,12 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
     }]
   }
 
-  var missing = 1
-  var id1 = this.socket.query(query, s.port, s.host, done)
-  var id2 = 0
+  var first = true
   var result = null
-
-  if (s.secondaryPort) {
-    missing++
-    id2 = this.socket.query(query, s.secondaryPort, s.host, done)
-  }
+  var id = this.socket.query(query, s.port, s.host, done)
 
   if (retries) {
-    this.socket.setRetries(id1, retries)
-    if (id2) this.socket.setRetries(id2, retries)
+    this.socket.setRetries(id, retries)
   }
 
   function done (_, res, query, port, host) {
@@ -509,20 +502,24 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
       }
       if (data && data.token) {
         self._parseData(null, data, i, host)
-        self.socket.cancel(id1)
-        self.socket.cancel(id2)
-
-        if (id2 && res.id === id2 && s.secondaryPort) {
-          s.port = s.secondaryPort
-          s.secondaryPort = 0
-        } else {
-          s.secondaryPort = 0
-        }
         result = data
       }
     }
 
-    if (!--missing) cb(result ? null : new Error('Probe failed'), result, s.port, host)
+    if (result) {
+      if (!first) {
+        s.port = s.secondaryPort
+        s.secondaryPort = 0
+      } else {
+        s.secondaryPort = 0
+      }
+
+      return cb(null, result, s.port, host)
+    }
+
+    if (!first || !s.secondaryPort) return cb(new Error('Probe failed'))
+    first = false
+    this.socket.query(query, s.secondaryPort, s.host, done)
   }
 }
 
@@ -572,7 +569,7 @@ DNSDiscovery.prototype.listen = function (ports, onlistening) {
 function noop () {}
 
 function parseAddr (addr) {
-  if (addr.indexOf(':') === -1) addr += ':53,5300'
+  if (addr.indexOf(':') === -1) addr += ':5300,53'
   var match = addr.match(/^([^:]+)(?::(\d{1,5})(?:,(\d{1,5}))?)?$/)
   if (!match) throw new Error('Could not parse ' + addr)
 
