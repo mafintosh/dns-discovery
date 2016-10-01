@@ -478,7 +478,7 @@ DNSDiscovery.prototype.whoami = function (cb) {
 DNSDiscovery.prototype._probe = function (i, retries, cb) {
   var self = this
   var s = this.servers[i]
-  var query = {
+  var q = {
     questions: [{
       type: 'TXT',
       name: this._domain
@@ -487,11 +487,9 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
 
   var first = true
   var result = null
-  var id = this.socket.query(query, s.port, s.host, done)
+  var id = this.socket.query(q, s.port, s.host, done)
 
-  if (retries) {
-    this.socket.setRetries(id, retries)
-  }
+  if (retries) this.socket.setRetries(id, retries)
 
   function done (_, res, query, port, host) {
     if (res) {
@@ -519,7 +517,8 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
 
     if (!first || !s.secondaryPort) return cb(new Error('Probe failed'))
     first = false
-    this.socket.query(query, s.secondaryPort, s.host, done)
+    id = self.socket.query(q, s.secondaryPort, s.host, done)
+    if (retries) self.socket.setRetries(id, retries)
   }
 }
 
