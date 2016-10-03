@@ -506,13 +506,13 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
 
     if (result) {
       if (!first) {
-        s.port = s.secondaryPort
+        s.port = port
         s.secondaryPort = 0
       } else {
         s.secondaryPort = 0
       }
 
-      return cb(null, result, s.port, host)
+      return cb(null, result, port, host)
     }
 
     if (!first || !s.secondaryPort) return cb(new Error('Probe failed'))
