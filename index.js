@@ -5,6 +5,7 @@ var crypto = require('crypto')
 var txt = require('dns-txt')()
 var network = require('network-address')
 var multicast = require('multicast-dns')
+var debug = require('debug')('dns-discovery')
 var store = require('./store')
 
 var IPv4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}.\d{1,3}$/
@@ -65,14 +66,17 @@ function DNSDiscovery (opts) {
   }
 
   function onerror (err) {
+    debug('Error', err)
     self.emit('error', err)
   }
 
   function onmulticastquery (message, rinfo) {
+    debug('MDNS query', rinfo.address + ':' + rinfo.port, message.questions.length, 'questions', message.answers.length, 'answers', message.additionals.length, 'additionals')
     self._onmulticastquery(message, rinfo.port, rinfo.address)
   }
 
   function onmulticastresponse (message, rinfo) {
+    debug('MDNS response', rinfo.address + ':' + rinfo.port, message.answers.length, 'answers', message.additionals.length, 'additionals')
     self._onmulticastresponse(message, rinfo.port, rinfo.address)
   }
 }
@@ -91,16 +95,19 @@ DNSDiscovery.prototype._onsocket = function (socket) {
   socket.on('error', onerror)
 
   function onerror (err) {
+    debug('Error', err)
     self.emit('error', err)
   }
 
   function onquery (message, port, host) {
+    debug('DNS query', host + ':' + port, message.questions.length, 'questions', message.answers.length, 'answers', message.additionals.length, 'additionals')
     self._onquery(message, port, host, socket)
   }
 }
 
 DNSDiscovery.prototype._rotateSecrets = function () {
   if (this._listening) {
+    debug('Rotating secrets')
     this._secrets.shift()
     this._secrets.push(crypto.randomBytes(32))
   }
@@ -148,7 +155,10 @@ DNSDiscovery.prototype._onmulticastresponse = function (response, port, host) {
 DNSDiscovery.prototype._onanswer = function (answer, port, host, socket) {
   var domain = parseDomain(answer.name)
   var id = parseId(answer.name, domain)
-  if (!id) return
+  if (!id) {
+    debug('Invalid ID in answer, discarding', { name: answer.name, domain: domain, host: host, port: port })
+    return
+  }
 
   if (answer.type === 'SRV') {
     if (!IPv4.test(answer.data.target)) return
@@ -156,6 +166,7 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host, socket) {
       port: answer.data.port || port,
       host: answer.data.target === '0.0.0.0' ? host : answer.data.target
     }
+    debug('Announce received via SRV', id, peer.host + ':' + 'peer.port')
     this.emit('peer', id, peer)
     return
   }
@@ -174,15 +185,22 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host, socket) {
       this._parsePeers(id, data, host)
     }
 
-    if (!this._listening) return
+    if (!this._listening) {
+      debug('Received TXT answer when not listening, discarding')
+      return
+    }
 
     if (!tokenMatch) {
       // check if old token matches
-      if (data.token !== hash(this._secrets[0], host)) return
+      if (data.token !== hash(this._secrets[0], host)) {
+        debug('Invalid token in TXT answer, discarding')
+        return
+      }
     }
 
     if (PORT.test(data.announce)) {
       var announce = Number(data.announce) || port
+      debug('Announce received via TXT', id, host + ':' + announce)
       this.emit('peer', id, {port: announce, host: host})
       if (this._domainStore.add(id, announce, host) && socket) {
         this._push(id, announce, host, socket)
@@ -192,11 +210,14 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host, socket) {
     if (PORT.test(data.unannounce)) {
       var unannounce = Number(data.unannounce) || port
       this._domainStore.remove(id, unannounce, host)
+      debug('Un-announce received via TXT', id, host + ':' + unannounce)
     }
 
     if (data.subscribe) {
+      debug('Subscribe-to-push received via TXT', id, host + ':' + port)
       this._pushStore.add(id, port, host)
     } else {
+      debug('Unsubscribe-from-push received via TXT', id, host + ':' + port)
       this._pushStore.remove(id, port, host)
     }
   }
@@ -216,6 +237,7 @@ DNSDiscovery.prototype._push = function (id, port, host, socket) {
     }]
   }
 
+  if (subs.length) debug('Pushing announcement to', subs.length, 'subscribers')
   for (var i = 0; i < subs.length; i++) {
     var peer = subs[i]
     var tid = socket.query(query, peer.port, peer.host)
@@ -227,6 +249,8 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
   var domain = parseDomain(query.name)
 
   if (query.type === 'TXT' && domain === query.name) {
+    // TODO wait, what is this? is it an unsubscribe? that's the only codepath in _onanswer this seems to match
+    // debug('Replying announce via TXT to', host + ':' + port)
     answers.push({
       type: 'TXT',
       name: query.name,
@@ -241,12 +265,16 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
   }
 
   var id = parseId(query.name, domain)
-  if (!id) return
+  if (!id) {
+    debug('Invalid ID in answer, discarding', { name: query.name, domain: domain, host: host, port: port })
+    return
+  }
 
   if (query.type === 'TXT') {
     var buf = toBuffer(this._domainStore.get(id, 100))
     var token = hash(this._secrets[1], host)
     if (multicast && !buf.length) return // just an optimization
+    debug('Replying known peers via TXT to', host + ':' + port)
     answers.push({
       type: 'TXT',
       name: query.name,
@@ -262,6 +290,7 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
   }
 
   var peers = this._domainStore.get(id, 10)
+  debug('Replying announce via', query.type, ' to', host + ':' + port)
 
   for (var i = 0; i < peers.length; i++) {
     var peer = peers[i]
@@ -301,7 +330,6 @@ DNSDiscovery.prototype._onquery = function (query, port, host, socket) {
   for (i = 0; i < query.additionals.length; i++) {
     this._onanswer(query.additionals[i], port, host, socket)
   }
-
   socket.response(query, reply, port, host)
 }
 
@@ -350,14 +378,17 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
 }
 
 DNSDiscovery.prototype.lookup = function (id, opts, cb) {
+  debug('lookup()', id)
   this._visit(1, id, 0, opts, cb)
 }
 
 DNSDiscovery.prototype.announce = function (id, port, opts, cb) {
+  debug('announce()', id)
   this._visit(2, id, port, opts, cb)
 }
 
 DNSDiscovery.prototype.unannounce = function (id, port, opts, cb) {
+  debug('unannounce()', id)
   this._visit(3, id, port, opts, cb)
 }
 
@@ -523,6 +554,7 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
 }
 
 DNSDiscovery.prototype.destroy = function (onclose) {
+  debug('destroy()')
   if (onclose) this.once('close', onclose)
 
   var self = this
@@ -550,6 +582,8 @@ DNSDiscovery.prototype.listen = function (ports, onlistening) {
 
   if (!ports) ports = [53, 5300]
   if (!Array.isArray(ports)) ports = [ports]
+
+  debug('Listening on port(s)', ports.join(', '))
 
   var self = this
   var missing = ports.length
