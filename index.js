@@ -71,12 +71,23 @@ function DNSDiscovery (opts) {
   }
 
   function onmulticastquery (message, rinfo) {
-    debug('MDNS query', rinfo.address + ':' + rinfo.port, message.questions.length, 'questions', message.answers.length, 'answers', message.additionals.length, 'additionals')
+    debug(
+      'MDNS query %s:%s %dQ %dA +%d',
+      rinfo.address, rinfo.port,
+      message.questions.length,
+      message.answers.length,
+      message.additionals.length
+    )
     self._onmulticastquery(message, rinfo.port, rinfo.address)
   }
 
   function onmulticastresponse (message, rinfo) {
-    debug('MDNS response', rinfo.address + ':' + rinfo.port, message.answers.length, 'answers', message.additionals.length, 'additionals')
+    debug(
+      'MDNS response %s:%s %dA +%d',
+      rinfo.address, rinfo.port,
+      message.answers.length,
+      message.additionals.length
+    )
     self._onmulticastresponse(message, rinfo.port, rinfo.address)
   }
 }
@@ -100,7 +111,13 @@ DNSDiscovery.prototype._onsocket = function (socket) {
   }
 
   function onquery (message, port, host) {
-    debug('DNS query', host + ':' + port, message.questions.length, 'questions', message.answers.length, 'answers', message.additionals.length, 'additionals')
+    debug(
+      'DNS query %s:%s %dQ %dA +%d',
+      host, port,
+      message.questions.length,
+      message.answers.length,
+      message.additionals.length
+    )
     self._onquery(message, port, host, socket)
   }
 }
@@ -249,8 +266,7 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
   var domain = parseDomain(query.name)
 
   if (query.type === 'TXT' && domain === query.name) {
-    // TODO wait, what is this? is it an unsubscribe? that's the only codepath in _onanswer this seems to match
-    // debug('Replying announce via TXT to', host + ':' + port)
+    debug('Replying state-info via TXT to %s:%s', host, port)
     answers.push({
       type: 'TXT',
       name: query.name,
