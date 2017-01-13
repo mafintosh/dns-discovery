@@ -531,6 +531,7 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
       name: this._domain
     }]
   }
+  debug('probing %s:%d', s.host, s.port)
 
   var first = true
   var result = null
@@ -559,11 +560,17 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
         s.secondaryPort = 0
       }
 
+      debug('probe of %s:%d succeeded', host, port)
       return cb(null, result, port, host)
     }
 
-    if (!first || !s.secondaryPort) return cb(new Error('Probe failed'))
+    if (!first || !s.secondaryPort) {
+      debug('probe of %s:%d failed', host, port)
+      return cb(new Error('Probe failed'))
+    }
+
     first = false
+    debug('retrying probe of %s at secondary port %d', host, s.secondaryPort)
     id = self.socket.query(q, s.secondaryPort, s.host, done)
     if (retries) self.socket.setRetries(id, retries)
   }
