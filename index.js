@@ -494,6 +494,7 @@ DNSDiscovery.prototype.whoami = function (cb) {
   if (this.servers.length) {
     for (var i = 0; i < this.servers.length; i++) this._probe(i, 2, done)
   } else {
+    debug('whoami() failed - no servers to ping')
     missing = 1
     process.nextTick(done)
   }
@@ -516,7 +517,12 @@ DNSDiscovery.prototype.whoami = function (cb) {
       }
     }
 
-    if (--missing || called) return
+    if (--missing || called) {
+      if (!called) {
+        debug('whoami() probe got response; waiting for a confirmation from %d other(s)', missing)
+      }
+      return
+    }
     if (data) cb(null, {port: 0, host: data.host})
     else cb(new Error('Probe failed'))
   }
