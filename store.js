@@ -111,6 +111,22 @@ Store.prototype.toJSON = function () {
   return entries
 }
 
+Store.prototype.getTopKeyStats = function (n) {
+  n = n || 10
+  var entries = []
+  var keys = Object.keys(this.entries.cache)
+  for (var i = 0; i < keys.length; i++) {
+    entries.push({
+      name: keys[i],
+      numRecords: this.entries.peek(keys[i]).values.length
+    })
+  }
+  entries.sort(function (a, b) {
+    return b.numRecords - a.numRecords
+  })
+  return entries.slice(0, n)
+}
+
 function Peer (port, host) {
   this.host = host || '127.0.0.1'
   this.port = port
