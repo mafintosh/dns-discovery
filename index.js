@@ -11,6 +11,10 @@ var store = require('./store')
 var IPv4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}.\d{1,3}$/
 var PORT = /^\d{1,5}$/
 
+const TYPE_LOOKUP = 1
+const TYPE_ANNOUNCE = 2
+const TYPE_UNANNOUNCE = 3
+
 module.exports = DNSDiscovery
 
 function DNSDiscovery (opts) {
@@ -363,15 +367,15 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
   var data = null
 
   switch (type) {
-    case 1:
+    case TYPE_LOOKUP:
       data = {subscribe: true, token: token}
       break
 
-    case 2:
+    case TYPE_ANNOUNCE:
       data = {subscribe: true, token: token, announce: '' + port}
       break
 
-    case 3:
+    case TYPE_UNANNOUNCE:
       data = {token: token, unannounce: '' + port}
       break
   }
@@ -395,17 +399,17 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
 
 DNSDiscovery.prototype.lookup = function (id, opts, cb) {
   debug('lookup()', id)
-  this._visit(1, id, 0, opts, cb)
+  this._visit(TYPE_LOOKUP, id, 0, opts, cb)
 }
 
 DNSDiscovery.prototype.announce = function (id, port, opts, cb) {
   debug('announce()', id)
-  this._visit(2, id, port, opts, cb)
+  this._visit(TYPE_ANNOUNCE, id, port, opts, cb)
 }
 
 DNSDiscovery.prototype.unannounce = function (id, port, opts, cb) {
   debug('unannounce()', id)
-  this._visit(3, id, port, opts, cb)
+  this._visit(TYPE_UNANNOUNCE, id, port, opts, cb)
 }
 
 DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
@@ -427,11 +431,11 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
     }
   }
 
-  if (type === 2) this._domainStore.add(id, port, '0.0.0.0')
-  if (type === 3) this._domainStore.remove(id, port, '0.0.0.0')
+  if (type === TYPE_ANNOUNCE) this._domainStore.add(id, port, '0.0.0.0')
+  if (type === TYPE_UNANNOUNCE) this._domainStore.remove(id, port, '0.0.0.0')
 
   if (opts.multicast !== false && this.multicast) {
-    if (type !== 3) {
+    if (type !== TYPE_UNANNOUNCE) {
       missing++
       this.multicast.query({
         questions: [{
