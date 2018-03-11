@@ -451,7 +451,7 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
     process.nextTick(done)
   }
 
-  function done (_, res, q, port, host) {
+  function done (_, res, q, _port, _host) {
     if (res) {
       success = true
       try {
@@ -459,7 +459,9 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
       } catch (err) {
         // do nothing
       }
-      if (data) self._parseData(id, data, q.index, host)
+      if (data) self._parseData(id, data, q.index, _host)
+      if (type === TYPE_ANNOUNCE) self.emit('announced', id, {port: port})
+      if (type === TYPE_UNANNOUNCE) self.emit('unannounced', id, {port: port})
     }
 
     if (!--missing) cb(success ? null : new Error('Query failed'))

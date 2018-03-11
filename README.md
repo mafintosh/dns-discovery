@@ -113,6 +113,20 @@ Emitted when a peer has been discovered.
  - **host** The address of the peer.
  - **port** The port the peer is listening on.
 
+#### `Event: "announced" (name, {port})`
+
+Emitted after a successful `announce()`.
+
+ - **name** The app name that was announced.
+ - **port** The port that was announced.
+
+#### `Event: "unannounced" (name, {port})`
+
+Emitted after a successful `unannounce()`.
+
+ - **name** The app name that was unannounced.
+ - **port** The port that was unannounced.
+
 #### `Event: "error" (err)`
 
 Emitted when networking errors occur, such as failures to bind the socket (EACCES, EADDRINUSE).
