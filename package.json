@@ -11,6 +11,7 @@
     "minimist": "^1.2.0",
     "multicast-dns": "^6.0.0",
     "network-address": "^1.1.0",
+    "pump": "^3.0.0",
     "speedometer": "^1.0.0",
     "unordered-set": "^1.1.0"
   },

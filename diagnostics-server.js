@@ -1,6 +1,7 @@
 var os = require('os')
 var http = require('http')
 var fs = require('fs')
+var pump = require('pump')
 var speedometer = require('speedometer')
 
 // capture the last 10 minutes of stats
@@ -62,13 +63,13 @@ exports.createServer = function (disc, opts = {}) {
     // serve
     if (req.url === '/' || req.url === '/index.html') {
       res.writeHead(200, {'Content-Type': 'text/html'})
-      fs.createReadStream('./diagnostics-server/index.html').pipe(res)
+      pump(fs.createReadStream('./diagnostics-server/index.html'), res)
     } else if (req.url === '/index.css') {
       res.writeHead(200, {'Content-Type': 'text/css'})
-      fs.createReadStream('./diagnostics-server/index.css').pipe(res)
+      pump(fs.createReadStream('./diagnostics-server/index.css'), res)
     } else if (req.url === '/index.js') {
       res.writeHead(200, {'Content-Type': 'application/javascript'})
-      fs.createReadStream('./diagnostics-server/index.js').pipe(res)
+      pump(fs.createReadStream('./diagnostics-server/index.js'), res)
     } else if (req.url === '/state.json') {
       res.writeHead(200, {'Content-Type': 'application/json'})
       res.end(JSON.stringify({
