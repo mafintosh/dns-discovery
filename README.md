@@ -55,13 +55,14 @@ If you have more than one discovery server you can specify an array
 
 #### `disc.lookup(name, [callback])`
 
-Do a lookup for a specific app name. When new peers are discovered for this name peer events will be emitted
+Do a lookup for a specific app name. When new peers are discovered for this name peer events will be emitted. The callback will be called when the query is complete.
 
 ``` js
 disc.on('peer', function (name, peer) {
-  console.log(name) // app name this peer was discovered for
-  console.log(peer) // {host: 'some-ip', port: somePort}
+  console.log(name) // app name this peer was discovered for (ie 'example')
+  console.log(peer) // {host: 'some-ip', port: 1234}
 })
+disc.lookup('example')
 ```
 
 #### `disc.announce(name, port, [options], [callback])`
@@ -95,6 +96,26 @@ The port defaults to `53` which is the standard dns port. Additionally it tries 
 #### `disc.destroy([onclose])`
 
 Destroy the discovery instance. Will destroy the underlying udp socket as well.
+
+#### `Event: "listening"`
+
+Emitted after a successful `listen()`.
+
+#### `Event: "close"`
+
+Emitted after a successful `destroy()`.
+
+#### `Event: "peer" (name, {host, port})
+
+Emitted when a peer has been discovered.
+
+ - **name** The app name the peer was discovered for.
+ - **host** The address of the peer.
+ - **port** The port the peer is listening on.
+
+#### `Event: "error" (err)`
+
+Emitted when networking errors occur, such as failures to bind the socket (EACCES, EADDRINUSE).
 
 ## CLI
 
