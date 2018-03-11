@@ -127,6 +127,14 @@ Emitted after a successful `unannounce()`.
  - **name** The app name that was unannounced.
  - **port** The port that was unannounced.
 
+#### `Event: "traffic" (type, details)`
+
+Emitted when any kind of message event occurs. The `type` will be prefixed with `'in:'` to indicate inbound, and `'out:'` to indicate outbound messages. This event is mostly useful for debugging.
+
+#### `Event: "secrets-rotated"`
+
+Emitted when the internal secrets used to generate session tokens have been rotated. This event is mostly useful for debugging.
+
 #### `Event: "error" (err)`
 
 Emitted when networking errors occur, such as failures to bind the socket (EACCES, EADDRINUSE).
