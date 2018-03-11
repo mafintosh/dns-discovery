@@ -11,6 +11,10 @@ var store = require('./store')
 var IPv4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}.\d{1,3}$/
 var PORT = /^\d{1,5}$/
 
+const TYPE_LOOKUP = 1
+const TYPE_ANNOUNCE = 2
+const TYPE_UNANNOUNCE = 3
+
 module.exports = DNSDiscovery
 
 function DNSDiscovery (opts) {
@@ -78,6 +82,7 @@ function DNSDiscovery (opts) {
       message.answers.length,
       message.additionals.length
     )
+    self.emit('traffic', 'in:multicastquery', {message: message, peer: rinfo})
     self._onmulticastquery(message, rinfo.port, rinfo.address)
   }
 
@@ -88,6 +93,7 @@ function DNSDiscovery (opts) {
       message.answers.length,
       message.additionals.length
     )
+    self.emit('traffic', 'in:multicastresponse', {message: message, peer: rinfo})
     self._onmulticastresponse(message, rinfo.port, rinfo.address)
   }
 }
@@ -118,6 +124,7 @@ DNSDiscovery.prototype._onsocket = function (socket) {
       message.answers.length,
       message.additionals.length
     )
+    self.emit('traffic', 'in:query', {message: message, peer: {port: port, host: host}})
     self._onquery(message, port, host, socket)
   }
 }
@@ -136,6 +143,7 @@ DNSDiscovery.prototype._rotateSecrets = function () {
     }
   }
 
+  this.emit('secrets-rotated')
   this._tick++
 }
 
@@ -154,6 +162,7 @@ DNSDiscovery.prototype._onmulticastquery = function (query, port, host) {
   }
 
   if (reply.answers.length) {
+    this.emit('traffic', 'out:multicastresponse', {message: reply})
     this.multicast.response(reply)
   }
 }
@@ -347,6 +356,8 @@ DNSDiscovery.prototype._onquery = function (query, port, host, socket) {
     this._onanswer(query.additionals[i], port, host, socket)
   }
   socket.response(query, reply, port, host)
+  // note: emit 'traffic' after calling .response() because socket.response() modifies `reply`
+  this.emit('traffic', 'out:response', {message: reply, peer: {port: port, host: host}})
 }
 
 DNSDiscovery.prototype._probeAndSend = function (type, i, id, port, cb) {
@@ -363,15 +374,15 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
   var data = null
 
   switch (type) {
-    case 1:
+    case TYPE_LOOKUP:
       data = {subscribe: true, token: token}
       break
 
-    case 2:
+    case TYPE_ANNOUNCE:
       data = {subscribe: true, token: token, announce: '' + port}
       break
 
-    case 3:
+    case TYPE_UNANNOUNCE:
       data = {token: token, unannounce: '' + port}
       break
   }
@@ -391,21 +402,22 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
   }
 
   this.socket.query(query, s.port, s.host, cb)
+  this.emit('traffic', 'out:query', {message: query, peer: s})
 }
 
 DNSDiscovery.prototype.lookup = function (id, opts, cb) {
   debug('lookup()', id)
-  this._visit(1, id, 0, opts, cb)
+  this._visit(TYPE_LOOKUP, id, 0, opts, cb)
 }
 
 DNSDiscovery.prototype.announce = function (id, port, opts, cb) {
   debug('announce()', id)
-  this._visit(2, id, port, opts, cb)
+  this._visit(TYPE_ANNOUNCE, id, port, opts, cb)
 }
 
 DNSDiscovery.prototype.unannounce = function (id, port, opts, cb) {
   debug('unannounce()', id)
-  this._visit(3, id, port, opts, cb)
+  this._visit(TYPE_UNANNOUNCE, id, port, opts, cb)
 }
 
 DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
@@ -427,18 +439,20 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
     }
   }
 
-  if (type === 2) this._domainStore.add(id, port, '0.0.0.0')
-  if (type === 3) this._domainStore.remove(id, port, '0.0.0.0')
+  if (type === TYPE_ANNOUNCE) this._domainStore.add(id, port, '0.0.0.0')
+  if (type === TYPE_UNANNOUNCE) this._domainStore.remove(id, port, '0.0.0.0')
 
   if (opts.multicast !== false && this.multicast) {
-    if (type !== 3) {
+    if (type !== TYPE_UNANNOUNCE) {
       missing++
-      this.multicast.query({
+      var message = {
         questions: [{
           type: 'TXT',
           name: id + '.' + this._domain
         }]
-      }, done)
+      }
+      this.multicast.query(message, done)
+      self.emit('traffic', 'out:multicastquery', {message: message})
     }
   }
 
@@ -447,7 +461,7 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
     process.nextTick(done)
   }
 
-  function done (_, res, q, port, host) {
+  function done (_, res, q, _port, _host) {
     if (res) {
       success = true
       try {
@@ -455,7 +469,9 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
       } catch (err) {
         // do nothing
       }
-      if (data) self._parseData(id, data, q.index, host)
+      if (data) self._parseData(id, data, q.index, _host)
+      if (type === TYPE_ANNOUNCE) self.emit('announced', id, {port: port})
+      if (type === TYPE_UNANNOUNCE) self.emit('unannounced', id, {port: port})
     }
 
     if (!--missing) cb(success ? null : new Error('Query failed'))
