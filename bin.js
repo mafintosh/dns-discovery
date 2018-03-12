@@ -13,6 +13,10 @@ var disc = discovery(argv)
 
 if (cmd === 'listen') {
   disc.listen(argv.port, onlisten)
+  if (argv.diag) {
+    var diagServer = require('./diagnostics-server').createServer(disc, {password: argv.diagpw})
+    diagServer.listen((typeof argv.diag === 'number' ? argv.diag : 3030), ondiaglisten)
+  }
 } else if (cmd === 'lookup') {
   disc.on('peer', onpeer)
   lookup()
@@ -35,7 +39,9 @@ if (cmd === 'listen') {
     '  listen\n' +
     '    --port=(optional port)\n' +
     '    --ttl=(optional ttl in seconds)\n' +
-    '    --domain=(optional authoritative domain)\n'
+    '    --domain=(optional authoritative domain)\n' +
+    '    --diag=(enable diagnostic server, optional port, default 3030)\n' +
+    '    --diagpw=(optional password for diagnostic server)'
   )
   process.exit(1)
 }
@@ -58,4 +64,9 @@ function onpeer (name, peer) {
 function onlisten (err) {
   if (err) throw err
   console.log('Server is listening on port %d', argv.port || 53)
+}
+
+function ondiaglisten (err) {
+  if (err) throw err
+  console.log('Diagnostics server is listening on port %d', (typeof argv.diag === 'number' ? argv.diag : 3030))
 }
