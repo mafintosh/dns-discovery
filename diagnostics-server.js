@@ -7,6 +7,7 @@ var speedometer = require('speedometer')
 // capture the last 10 minutes of stats
 const HISTORY_LIMIT = 60
 const HISTORY_INTERVAL = 10e3
+const LOG_FILE_PATH = './diagnostics-server.log'
 
 var queriesSpeed = speedometer()
 var multicastQueriesSpeed = speedometer()
@@ -15,10 +16,11 @@ var multicastQueriesPS = []
 
 exports.createServer = function (disc, opts = {}) {
   // logging
-  var log = ''
+  try { fs.unlinkSync(LOG_FILE_PATH) } catch (e) {}
+  var logAppendStream = fs.createWriteStream(LOG_FILE_PATH, {flags:'a'})
   function track(evt) {
     disc.on(evt, (...args) => {
-      log += renderLogEntry(evt, (new Date()).toLocaleString(), args)
+      logAppendStream.write(renderLogEntry(evt, (new Date()).toLocaleString(), args))
     })
   }
   track('traffic')
@@ -83,7 +85,7 @@ exports.createServer = function (disc, opts = {}) {
       }))
     } else if (req.url === '/log.txt') {
       res.writeHead(200, {'Content-Type': 'text/plain'})
-      res.end(log)
+      pump(fs.createReadStream('./diagnostics-server.log'), res)
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' })
       res.end('Not found')
