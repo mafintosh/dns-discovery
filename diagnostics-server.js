@@ -135,7 +135,11 @@ function renderDNSMsg ({id, questions, answers, additionals}) {
       return `${safen(prefix)}.${safen(type)}:${safen(name)}`
     }
   }
-  return ((id) ? `id=${safen(id)} ` : '') + `${questions.map(item('Q')).join(' ')} ${answers.map(item('A')).join(' ')} ${questions.map(item('ADD')).join(' ')}`
+  function list (l, prefix) {
+    if (!l || !l.length) return ''
+    return l.map(item(prefix)).join(' ')
+  }
+  return ((id) ? `id=${safen(id)} ` : '') + `${list(questions, 'Q')} ${list(answers, 'A')} ${list(additionals, 'ADD')}`
 }
 
 function safen (str) {
