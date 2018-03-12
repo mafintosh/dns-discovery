@@ -480,7 +480,7 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
 
 DNSDiscovery.prototype._parsePeers = function (id, data, host) {
   try {
-    var buf = Buffer(data.peers, 'base64')
+    var buf = Buffer.from(data.peers, 'base64')
   } catch (err) {
     return
   }
@@ -675,7 +675,7 @@ function parseDomain (name) {
 }
 
 function toBuffer (peers) {
-  var buf = Buffer(peers.length * 6)
+  var buf = Buffer.alloc(peers.length * 6)
   for (var i = 0; i < peers.length; i++) {
     if (!peers[i].buffer) peers[i].buffer = encodePeer(peers[i])
     peers[i].buffer.copy(buf, i * 6)
@@ -684,7 +684,7 @@ function toBuffer (peers) {
 }
 
 function encodePeer (peer) {
-  var buf = Buffer(6)
+  var buf = Buffer.alloc(6)
   var parts = peer.host.split('.')
   buf[0] = Number(parts[0] || 0)
   buf[1] = Number(parts[1] || 0)
