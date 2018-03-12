@@ -9,7 +9,7 @@ var CircularAppendFile = require('circular-append-file')
 const HISTORY_LIMIT = 60
 const HISTORY_INTERVAL = 10e3
 const LOG_FILE_PATH = './diagnostics-server.log'
-const LOG_SIZE_LIMIT = 1024 /*1kb*/ * 1024 /*1mb*/ * 32 /*32mb*/
+const LOG_SIZE_LIMIT = 1024 /* 1kb */ * 1024 /* 1mb */ * 32 /* 32mb */
 
 var queriesSpeed = speedometer()
 var multicastQueriesSpeed = speedometer()
@@ -19,7 +19,7 @@ var multicastQueriesPS = []
 exports.createServer = function (disc, opts = {}) {
   // logging
   var logFile = CircularAppendFile(LOG_FILE_PATH, {maxSize: LOG_SIZE_LIMIT})
-  function track(evt) {
+  function track (evt) {
     disc.on(evt, (...args) => {
       logFile.append(renderLogEntry(evt, (new Date()).toLocaleString(), args))
     })
@@ -139,5 +139,5 @@ function renderDNSMsg ({id, questions, answers, additionals}) {
 }
 
 function safen (str) {
-  return (''+str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&/g, '&amp;').replace(/"/g, '')
+  return ('' + str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&/g, '&amp;').replace(/"/g, '')
 }

@@ -1,3 +1,5 @@
+/* globals fetch */
+
 const navAs = Array.from(document.querySelectorAll('#nav > a'))
 const viewDivs = Array.from(document.querySelectorAll('#views > div'))
 var currentPoll
@@ -82,5 +84,5 @@ async function fetchAndRenderLog () {
 setView('state')
 
 function safen (str) {
-  return (''+str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&/g, '&amp;').replace(/"/g, '')
+  return ('' + str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&/g, '&amp;').replace(/"/g, '')
 }
