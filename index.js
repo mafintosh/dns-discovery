@@ -199,7 +199,7 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host, socket) {
 
   if (answer.type === 'TXT') {
     try {
-      var data = txt.decode(answer.data)
+      var data = txt.decode(answer.data[0])
     } catch (err) {
       return
     }
@@ -465,7 +465,7 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
     if (res) {
       success = true
       try {
-        var data = res.answers.length && txt.decode(res.answers[0].data)
+        var data = res.answers.length && txt.decode(res.answers[0].data[0])
       } catch (err) {
         // do nothing
       }
@@ -564,7 +564,7 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
   function done (_, res, query, port, host) {
     if (res) {
       try {
-        var data = res.answers.length && txt.decode(res.answers[0].data)
+        var data = res.answers.length && txt.decode(res.answers[0].data[0])
       } catch (err) {
         // do nothing
       }
