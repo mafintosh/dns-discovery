@@ -52,16 +52,14 @@ async function fetchAndRenderPeers () {
     <table>${state.stats.topKeys.map(entry => `<tr><td>${safen(entry.name)}</td><td>${safen(entry.numRecords)} peers</td></tr>`).join('')}</table>
     
     <h2>Peer tables</h2>
-    ${state.peers.map(peerGroup => {
-      return `
-        <h3>Key: ${safen(peerGroup.name)}</h3>
-        <table>
-          ${peerGroup.records.map(record => (`
-            <tr><td>${safen(record.address)}</td></tr>
-          `)).join('')}
-        </table>
-      `
-    }).join('')}
+    ${state.peers.map(peerGroup => `
+      <h3>Key: ${safen(peerGroup.name)}</h3>
+      <table>
+        ${peerGroup.records.map(record => (`
+          <tr><td>${safen(record.address)}</td></tr>
+        `)).join('')}
+      </table>
+    `).join('')}
   `
   document.querySelector('#view-state').innerHTML = html
 }
