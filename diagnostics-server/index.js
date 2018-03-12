@@ -27,13 +27,8 @@ function setView (view) {
 }
 
 const setupView = {
-  'state': () => {
-    // setInterval(fetchAndRenderPeers, 10e3) TODO do we want this?
-    fetchAndRenderPeers()
-  },
-  'log': async () => {
-    fetchAndRenderLog()
-  }
+  'state': fetchAndRenderPeers,
+  'log': fetchAndRenderLog
 }
 
 async function fetchAndRenderPeers () {

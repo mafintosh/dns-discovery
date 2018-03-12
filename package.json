@@ -5,20 +5,20 @@
   "main": "index.js",
   "dependencies": {
     "circular-append-file": "^1.0.1",
-    "debug": "^2.3.2",
-    "dns-socket": "^1.4.2",
+    "debug": "^2.6.9",
+    "dns-socket": "^1.6.3",
     "dns-txt": "^2.0.1",
     "lru": "^2.0.0",
     "minimist": "^1.2.0",
-    "multicast-dns": "^6.0.0",
-    "network-address": "^1.1.0",
+    "multicast-dns": "^6.2.3",
+    "network-address": "^1.1.2",
     "pump": "^3.0.0",
     "speedometer": "^1.0.0",
     "unordered-set": "^1.1.0"
   },
   "devDependencies": {
-    "standard": "^6.0.7",
-    "tape": "^4.4.0"
+    "standard": "^11.0.0",
+    "tape": "^4.9.0"
   },
   "bin": {
     "dns-discovery": "./bin.js"
