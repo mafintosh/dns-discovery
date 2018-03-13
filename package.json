@@ -1,6 +1,6 @@
 {
   "name": "dns-discovery",
-  "version": "5.6.1",
+  "version": "6.0.0",
   "description": "Discovery peers in a distributed system using regular dns and multicast dns.",
   "main": "index.js",
   "dependencies": {
