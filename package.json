@@ -7,7 +7,6 @@
     "circular-append-file": "^1.0.1",
     "debug": "^2.6.9",
     "dns-socket": "^3.0.0",
-    "dns-txt": "^2.0.1",
     "lru": "^2.0.0",
     "minimist": "^1.2.0",
     "multicast-dns": "^7.0.0",

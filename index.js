@@ -2,7 +2,6 @@ var dns = require('dns-socket')
 var events = require('events')
 var util = require('util')
 var crypto = require('crypto')
-var txt = require('dns-txt')()
 var network = require('network-address')
 var multicast = require('multicast-dns')
 var debug = require('debug')('dns-discovery')
@@ -199,7 +198,7 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host, socket) {
 
   if (answer.type === 'TXT') {
     try {
-      var data = txt.decode(answer.data[0])
+      var data = decodeTxt(answer.data)
     } catch (err) {
       return
     }
@@ -280,7 +279,7 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
       type: 'TXT',
       name: query.name,
       ttl: this._ttl,
-      data: txt.encode({
+      data: encodeTxt({
         token: hash(this._secrets[1], host),
         host: host,
         port: '' + port
@@ -304,7 +303,7 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
       type: 'TXT',
       name: query.name,
       ttl: this._ttl,
-      data: txt.encode(buf.length ? {
+      data: encodeTxt(buf.length ? {
         token: token,
         peers: buf.toString('base64')
       } : {
@@ -397,7 +396,7 @@ DNSDiscovery.prototype._send = function (type, i, id, port, cb) {
       type: 'TXT',
       name: id + '.' + this._domain,
       ttl: this._ttl,
-      data: txt.encode(data)
+      data: encodeTxt(data)
     }]
   }
 
@@ -465,7 +464,7 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
     if (res) {
       success = true
       try {
-        var data = res.answers.length && txt.decode(res.answers[0].data[0])
+        var data = res.answers.length && decodeTxt(res.answers[0].data)
       } catch (err) {
         // do nothing
       }
@@ -564,7 +563,7 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
   function done (_, res, query, port, host) {
     if (res) {
       try {
-        var data = res.answers.length && txt.decode(res.answers[0].data[0])
+        var data = res.answers.length && decodeTxt(res.answers[0].data)
       } catch (err) {
         // do nothing
       }
@@ -700,4 +699,28 @@ function decodePeer (buf, offset) {
   var port = buf.readUInt16BE(offset)
   offset += 2
   return {port: port, host: host}
+}
+
+function decodeTxt (bufs) {
+  var data = {}
+
+  for (var i = 0; i < bufs.length; i++) {
+    var buf = bufs[i]
+    var j = buf.indexOf(61) // '='
+    if (j === -1) data[buf.toString()] = true
+    else data[buf.slice(0, j).toString()] = buf.slice(j + 1).toString()
+  }
+
+  return data
+}
+
+function encodeTxt (data) {
+  var keys = Object.keys(data)
+  var bufs = []
+
+  for (var i = 0; i < keys.length; i++) {
+    bufs.push(Buffer.from(keys[i] + '=' + data[keys[i]]))
+  }
+
+  return bufs
 }
