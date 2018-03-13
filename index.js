@@ -452,7 +452,7 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
         }]
       }
       this.multicast.query(message, done)
-      self.emit('traffic', 'out:multicastquery', {message: message})
+      this.emit('traffic', 'out:multicastquery', {message: message})
     }
   }
 
@@ -464,6 +464,7 @@ DNSDiscovery.prototype._visit = function (type, id, port, opts, cb) {
   function done (_, res, q, _port, _host) {
     if (res) {
       success = true
+      self.emit('traffic', 'in:response', {message: res, peer: {host: _host, port: _port}})
       try {
         var data = res.answers.length && txt.decode(res.answers[0].data[0])
       } catch (err) {
@@ -563,6 +564,7 @@ DNSDiscovery.prototype._probe = function (i, retries, cb) {
 
   function done (_, res, query, port, host) {
     if (res) {
+      self.emit('traffic', 'in:response', {message: res, peer: {host: host, port: port}})
       try {
         var data = res.answers.length && txt.decode(res.answers[0].data[0])
       } catch (err) {
