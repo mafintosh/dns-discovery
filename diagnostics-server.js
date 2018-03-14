@@ -103,6 +103,8 @@ function renderLogEntry (evt, ts, args) {
       switch (args[0]) {
         case 'in:query':
           return `${ts} <- query              (from: ${info.peer.host}:${info.peer.port})    ${renderDNSMsg(info.message)}\n`
+        case 'in:response':
+          return `${ts} <- response           (to: ${info.peer.host}:${info.peer.port})      ${renderDNSMsg(info.message)}\n`
         case 'in:multicastquery':
           return `${ts} <- multicast query    (from: ${info.peer.address}:${info.peer.port})   ${renderDNSMsg(info.message)}\n`
         case 'in:multicastresponse':
