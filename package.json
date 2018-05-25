@@ -5,15 +5,15 @@
   "main": "index.js",
   "dependencies": {
     "circular-append-file": "^1.0.1",
-    "debug": "^2.6.9",
+    "debug": "^3.1.0",
     "dns-socket": "^3.0.0",
-    "lru": "^2.0.0",
+    "lru": "^3.1.0",
     "minimist": "^1.2.0",
     "multicast-dns": "^7.0.0",
     "network-address": "^1.1.2",
     "pump": "^3.0.0",
     "speedometer": "^1.0.0",
-    "unordered-set": "^1.1.0"
+    "unordered-set": "^2.0.0"
   },
   "devDependencies": {
     "standard": "^11.0.0",
