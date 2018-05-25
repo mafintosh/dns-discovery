@@ -547,55 +547,60 @@ DNSDiscovery.prototype.whoami = function (cb) {
 DNSDiscovery.prototype._probe = function (i, retries, cb) {
   var self = this
   var s = this.servers[i]
+
+  this.__probe('primary', i, s.port, s.host, retries, primaryDone)
+
+  function done (err, data, port, host) {
+    if (err) {
+      return cb(err)
+    }
+    s.port = port
+    s.secondaryPort = 0
+    cb(null, data, port, host)
+  }
+
+  function primaryDone (err, data, port, host) {
+    if (err && s.secondaryPort) {
+      return self.__probe('secondary', i, s.secondaryPort, s.host, retries, done)
+    }
+    return done(err, data, port, host)
+  }
+}
+
+DNSDiscovery.prototype.__probe = function (type, i, port, host, retries, cb) {
+  var self = this
   var q = {
     questions: [{
       type: 'TXT',
       name: this._domain
     }]
   }
-  debug('probing %s:%d', s.host, s.port)
+  debug('probing %s:%d (%s); retries=%i', host, port, type, retries)
 
-  var first = true
-  var result = null
-  var id = this.socket.query(q, s.port, s.host, done)
+  var id = this.socket.query(q, port, host, done)
 
   if (retries) this.socket.setRetries(id, retries)
 
-  function done (_, res, query, port, host) {
+  function done (error, res, query) {
+    var data
     if (res) {
       self.emit('traffic', 'in:response', {message: res, peer: {host: host, port: port}})
       try {
-        var data = res.answers.length && decodeTxt(res.answers[0].data)
+        data = res.answers.length && decodeTxt(res.answers[0].data)
       } catch (err) {
-        // do nothing
-      }
-      if (data && data.token) {
-        self._parseData(null, data, i, host)
-        result = data
+        error = err
       }
     }
-
-    if (result) {
-      if (!first) {
-        s.port = port
-        s.secondaryPort = 0
-      } else {
-        s.secondaryPort = 0
-      }
-
-      debug('probe of %s:%d succeeded', host, port)
-      return cb(null, result, port, host)
+    if (!data || !data.token || error) {
+      debug('probe of %s:%d failed (%s)', host, port, type)
+      debug('received data: %o', res)
+      debug('received error: %s', error)
+      return cb(new Error('Probe failed'), null, port, host)
     }
+    self._parseData(null, data, i, host)
 
-    if (!first || !s.secondaryPort) {
-      debug('probe of %s:%d failed', host, port)
-      return cb(new Error('Probe failed'))
-    }
-
-    first = false
-    debug('retrying probe of %s at secondary port %d', host, s.secondaryPort)
-    id = self.socket.query(q, s.secondaryPort, s.host, done)
-    if (retries) self.socket.setRetries(id, retries)
+    debug('probe of %s:%d succeeded (%s)', host, port, type)
+    cb(null, data, port, host)
   }
 }
 
