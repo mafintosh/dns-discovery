@@ -30,7 +30,7 @@ function DNSDiscovery (opts) {
   this._sockets = []
   this._onsocket(this.socket)
 
-  this.multicast = opts.multicast !== false ? multicast() : null
+  this.multicast = opts.multicast !== false ? (isMulticaster(opts.multicast) ? opts.multicast : multicast()) : null
   if (this.multicast) {
     this.multicast.on('query', onmulticastquery)
     this.multicast.on('response', onmulticastresponse)
@@ -725,4 +725,8 @@ function encodeTxt (data) {
   }
 
   return bufs
+}
+
+function isMulticaster (m) {
+  return typeof m === 'object' && m && m.announce
 }
