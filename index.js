@@ -162,7 +162,7 @@ DNSDiscovery.prototype._onmulticastquery = function (query, port, host) {
 
   if (reply.answers.length) {
     this.emit('traffic', 'out:multicastresponse', {message: reply})
-    this.multicast.response(reply)
+    this.multicast.response(reply, {port: port})
   }
 }
 

@@ -9,7 +9,7 @@
     "dns-socket": "^3.0.0",
     "lru": "^2.0.0",
     "minimist": "^1.2.0",
-    "multicast-dns": "^7.0.0",
+    "multicast-dns": "^7.1.1",
     "network-address": "^1.1.2",
     "pump": "^3.0.0",
     "speedometer": "^1.0.0",
