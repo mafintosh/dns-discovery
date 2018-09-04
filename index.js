@@ -728,5 +728,5 @@ function encodeTxt (data) {
 }
 
 function isMulticaster (m) {
-  return typeof m === 'object' && m && m.announce
+  return typeof m === 'object' && m && typeof m.query === 'function'
 }
