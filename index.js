@@ -211,9 +211,10 @@ DNSDiscovery.prototype._onanswer = function (answer, port, host, socket) {
     }
 
     if (!this._listening) {
-      debug('Received TXT answer when not listening, discarding')
       return
     }
+
+    // We are in server mode now. Add the record to the cache
 
     if (!tokenMatch) {
       // check if old token matches
