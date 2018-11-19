@@ -273,7 +273,7 @@ DNSDiscovery.prototype._push = function (id, port, host, socket) {
 
 DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multicast) {
   var domain = parseDomain(query.name)
-  
+
   if (domain !== this._domain) return
 
   if (query.type === 'TXT' && domain === query.name) {
