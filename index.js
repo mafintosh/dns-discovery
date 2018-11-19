@@ -293,7 +293,7 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
 
   var id = parseId(query.name, domain)
   if (!id) {
-    debug('Invalid ID in answer, discarding', { name: query.name, domain: domain, host: host, port: port })
+    debug('Invalid ID in question, discarding', { name: query.name, domain: domain, host: host, port: port })
     return
   }
 
