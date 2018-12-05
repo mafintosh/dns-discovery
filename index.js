@@ -274,6 +274,8 @@ DNSDiscovery.prototype._push = function (id, port, host, socket) {
 DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multicast) {
   var domain = parseDomain(query.name)
 
+  if (domain !== this._domain) return
+
   if (query.type === 'TXT' && domain === query.name) {
     debug('Replying state-info via TXT to %s:%s', host, port)
     answers.push({
@@ -291,7 +293,7 @@ DNSDiscovery.prototype._onquestion = function (query, port, host, answers, multi
 
   var id = parseId(query.name, domain)
   if (!id) {
-    debug('Invalid ID in answer, discarding', { name: query.name, domain: domain, host: host, port: port })
+    debug('Invalid ID in question, discarding', { name: query.name, domain: domain, host: host, port: port })
     return
   }
 
